@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain, useBalance } from "wagmi";
 import { Wallet, ChevronDown, LogOut, Copy, ExternalLink, Check, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,6 +14,11 @@ const SUPPORTED_CHAINS = [
 
 export function WalletButton() {
     const { address, isConnected } = useAccount();
+    // Prevent hydration mismatch by deferring connected state until mounted
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
     const { connectors, connect, isPending } = useConnect();
     const { disconnect } = useDisconnect();
     const chainId = useChainId();
@@ -36,6 +41,17 @@ export function WalletButton() {
     };
 
     const formatAddress = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+
+    // Render placeholder until hydration is complete to prevent mismatch
+    if (!mounted) {
+        return (
+            <button
+                className="px-6 py-2 rounded-full bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity text-sm"
+            >
+                Connect Wallet
+            </button>
+        );
+    }
 
     if (!isConnected) {
         return (

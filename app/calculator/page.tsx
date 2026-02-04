@@ -75,8 +75,9 @@ export default function CalculatorPage() {
     const [fundingRate, setFundingRate] = useState(0.015); // Daily rate as percentage
     const [autoCompound, setAutoCompound] = useState(true);
     const [compoundFrequency, setCompoundFrequency] = useState<"daily" | "weekly" | "monthly">("weekly");
-    const [showAdvanced, setShowAdvanced] = useState(false);
     const [showChart, setShowChart] = useState(true);
+    // Advanced settings always visible
+    const showAdvanced = true;
 
     const hedgePercent = 100 - lpPercent;
 
@@ -253,132 +254,121 @@ export default function CalculatorPage() {
                             <AllocationDonut
                                 lpPercent={lpPercent}
                                 onChange={setLpPercent}
-                                size={220}
+                                size={200}
                             />
-                            <p className="text-xs text-secondary-foreground text-center mt-4">
-                                Drag the handle to adjust LP vs Hedge allocation (50-100% LP)
+                            <p className="text-xs text-secondary-foreground text-center mt-3">
+                                Drag the handle to adjust LP vs Hedge allocation
                             </p>
                         </div>
 
-                        {/* Investment Amount */}
-                        <div className="p-6 rounded-2xl bg-card border">
-                            <label className="text-xs font-bold text-secondary-foreground uppercase tracking-widest mb-3 block">
-                                Initial Investment
-                            </label>
-                            <div className="text-4xl font-mono font-bold text-primary mb-4">
-                                ${investment.toLocaleString()}
-                            </div>
-                            <input
-                                type="range"
-                                min="100"
-                                max="1000000"
-                                step="100"
-                                value={investment}
-                                onChange={(e) => setInvestment(Number(e.target.value))}
-                                className="w-full h-2 bg-secondary/50 rounded-full appearance-none cursor-pointer accent-primary"
-                            />
-                            <div className="flex justify-between text-xs text-secondary-foreground mt-2">
-                                <span>$100</span>
-                                <span>$1M</span>
-                            </div>
-                        </div>
-
-                        {/* Time Period */}
-                        <div className="p-6 rounded-2xl bg-card border">
-                            <label className="text-xs font-bold text-secondary-foreground uppercase tracking-widest mb-3 block">
-                                Time Period
-                            </label>
-                            <div className="text-4xl font-mono font-bold mb-4">
-                                {days} <span className="text-xl text-secondary-foreground">days</span>
-                            </div>
-                            <input
-                                type="range"
-                                min="1"
-                                max="365"
-                                value={days}
-                                onChange={(e) => setDays(Number(e.target.value))}
-                                className="w-full h-2 bg-secondary/50 rounded-full appearance-none cursor-pointer accent-primary"
-                            />
-                            <div className="flex justify-between text-xs text-secondary-foreground mt-2">
-                                <span>1 day</span>
-                                <span>1 year</span>
-                            </div>
-                        </div>
-
-                        {/* Market Scenario */}
-                        <div className="p-6 rounded-2xl bg-card border">
-                            <label className="text-xs font-bold text-secondary-foreground uppercase tracking-widest mb-4 block">
-                                Market Scenario
-                            </label>
-                            <div className="grid grid-cols-3 gap-3 mb-4">
-                                {[
-                                    { key: "bull" as const, label: "Bull", icon: TrendingUp, change: "+50%", color: "text-success" },
-                                    { key: "sideways" as const, label: "Sideways", icon: Minus, change: "±0%", color: "text-warning" },
-                                    { key: "bear" as const, label: "Bear", icon: TrendingDown, change: "-30%", color: "text-destructive" },
-                                ].map((s) => (
-                                    <button
-                                        key={s.key}
-                                        onClick={() => setScenario(s.key)}
-                                        className={`p-4 rounded-xl border-2 transition-all ${
-                                            scenario === s.key
-                                                ? "border-primary bg-primary/5"
-                                                : "border-transparent bg-secondary/30 hover:bg-secondary/50"
-                                        }`}
-                                    >
-                                        <s.icon className={`w-6 h-6 mx-auto mb-2 ${s.color}`} />
-                                        <div className="text-sm font-bold">{s.label}</div>
-                                        <div className="text-xs text-secondary-foreground">{s.change}</div>
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Custom Input */}
-                            <button
-                                onClick={() => setScenario("custom")}
-                                className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between ${
-                                    scenario === "custom"
-                                        ? "border-primary bg-primary/5"
-                                        : "border-transparent bg-secondary/30 hover:bg-secondary/50"
-                                }`}
-                            >
-                                <span className="text-sm font-medium">Custom price change</span>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="number"
-                                        value={customPriceChange}
-                                        onChange={(e) => {
-                                            setCustomPriceChange(Number(e.target.value));
-                                            setScenario("custom");
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="w-20 px-2 py-1 rounded-lg bg-background border text-right font-mono text-sm"
-                                    />
-                                    <span className="text-sm text-secondary-foreground">%</span>
-                                </div>
-                            </button>
-                        </div>
-
-                        {/* Auto-Compound & Advanced */}
+                        {/* Combined Settings Card - Investment, Period, Scenario, Compound */}
                         <div className="rounded-2xl bg-card border overflow-hidden">
-                            {/* Auto-compound toggle */}
+                            {/* Investment Amount */}
                             <div className="p-4 border-b">
-                                <label className="flex items-start gap-3 cursor-pointer">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-xs font-bold text-secondary-foreground uppercase tracking-widest">
+                                        Initial Investment
+                                    </label>
+                                    <div className="text-xl font-mono font-bold text-primary">
+                                        ${investment.toLocaleString()}
+                                    </div>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="100"
+                                    max="1000000"
+                                    step="100"
+                                    value={investment}
+                                    onChange={(e) => setInvestment(Number(e.target.value))}
+                                    className="w-full h-2 bg-secondary/50 rounded-full appearance-none cursor-pointer accent-primary"
+                                />
+                                <div className="flex justify-between text-[10px] text-secondary-foreground mt-1">
+                                    <span>$100</span>
+                                    <span>$1M</span>
+                                </div>
+                            </div>
+
+                            {/* Time Period */}
+                            <div className="p-4 border-b">
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-xs font-bold text-secondary-foreground uppercase tracking-widest">
+                                        Time Period
+                                    </label>
+                                    <div className="text-xl font-mono font-bold">
+                                        {days} <span className="text-sm text-secondary-foreground">days</span>
+                                    </div>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="365"
+                                    value={days}
+                                    onChange={(e) => setDays(Number(e.target.value))}
+                                    className="w-full h-2 bg-secondary/50 rounded-full appearance-none cursor-pointer accent-primary"
+                                />
+                                <div className="flex justify-between text-[10px] text-secondary-foreground mt-1">
+                                    <span>1 day</span>
+                                    <span>1 year</span>
+                                </div>
+                            </div>
+
+                            {/* Market Scenario */}
+                            <div className="p-4 border-b">
+                                <label className="text-xs font-bold text-secondary-foreground uppercase tracking-widest mb-3 block">
+                                    Market Scenario
+                                </label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {[
+                                        { key: "bull" as const, label: "Bull", icon: TrendingUp, change: "+50%", color: "text-success" },
+                                        { key: "sideways" as const, label: "Flat", icon: Minus, change: "±0%", color: "text-warning" },
+                                        { key: "bear" as const, label: "Bear", icon: TrendingDown, change: "-30%", color: "text-destructive" },
+                                        { key: "custom" as const, label: "Custom", icon: Calculator, change: `${customPriceChange >= 0 ? '+' : ''}${customPriceChange}%`, color: "text-primary" },
+                                    ].map((s) => (
+                                        <button
+                                            key={s.key}
+                                            onClick={() => setScenario(s.key)}
+                                            className={`p-2 rounded-xl border-2 transition-all ${
+                                                scenario === s.key
+                                                    ? "border-primary bg-primary/5"
+                                                    : "border-transparent bg-secondary/30 hover:bg-secondary/50"
+                                            }`}
+                                        >
+                                            <s.icon className={`w-4 h-4 mx-auto mb-1 ${s.color}`} />
+                                            <div className="text-[10px] font-bold">{s.label}</div>
+                                            <div className="text-[9px] text-secondary-foreground">{s.change}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                                {scenario === "custom" && (
+                                    <div className="mt-3 flex items-center gap-2">
+                                        <span className="text-xs text-secondary-foreground">Price change:</span>
+                                        <input
+                                            type="number"
+                                            value={customPriceChange}
+                                            onChange={(e) => setCustomPriceChange(Number(e.target.value))}
+                                            className="flex-1 px-3 py-1.5 rounded-lg bg-background border text-right font-mono text-sm"
+                                        />
+                                        <span className="text-sm text-secondary-foreground">%</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Auto-compound toggle */}
+                            <div className="p-4">
+                                <label className="flex items-center gap-3 cursor-pointer">
                                     <input
                                         type="checkbox"
                                         checked={autoCompound}
                                         onChange={(e) => setAutoCompound(e.target.checked)}
-                                        className="w-5 h-5 rounded accent-primary mt-0.5"
+                                        className="w-5 h-5 rounded accent-primary"
                                     />
-                                    <div className="flex-1">
+                                    <div className="flex-1 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <RefreshCw className={`w-4 h-4 ${autoCompound ? "text-primary" : "text-secondary-foreground"}`} />
-                                            <span className="font-bold">Auto-compound LP fees</span>
+                                            <span className="font-bold text-sm">Auto-compound</span>
                                         </div>
-                                        <p className="text-xs text-secondary-foreground mt-1">
-                                            Reinvest earned fees to maximize returns via compound interest
-                                        </p>
                                         {autoCompound && (
-                                            <div className="flex gap-2 mt-3">
+                                            <div className="flex gap-1">
                                                 {(["daily", "weekly", "monthly"] as const).map((freq) => (
                                                     <button
                                                         key={freq}
@@ -386,13 +376,13 @@ export default function CalculatorPage() {
                                                             e.preventDefault();
                                                             setCompoundFrequency(freq);
                                                         }}
-                                                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
+                                                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
                                                             compoundFrequency === freq
                                                                 ? "bg-primary text-primary-foreground"
                                                                 : "bg-secondary/50 hover:bg-secondary"
                                                         }`}
                                                     >
-                                                        {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                                                        {freq.charAt(0).toUpperCase()}
                                                     </button>
                                                 ))}
                                             </div>
@@ -400,67 +390,58 @@ export default function CalculatorPage() {
                                     </div>
                                 </label>
                             </div>
+                        </div>
 
-                            {/* Advanced Settings Toggle */}
-                            <button
-                                onClick={() => setShowAdvanced(!showAdvanced)}
-                                className="w-full p-4 flex items-center justify-between hover:bg-secondary/20 transition-colors"
-                            >
+                        {/* Advanced Settings - Always Visible */}
+                        <div className="rounded-2xl bg-card border overflow-hidden">
+                            <div className="p-4 border-b bg-card/50">
                                 <span className="text-sm font-bold">Advanced Settings</span>
-                                <ChevronDown className={`w-4 h-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-                            </button>
+                            </div>
 
-                            <AnimatePresence>
-                                {showAdvanced && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: "auto", opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="overflow-hidden"
-                                    >
-                                        <div className="p-6 pt-0 space-y-6">
-                                            {/* LP APR */}
-                                            <div>
-                                                <div className="flex justify-between text-sm mb-2">
-                                                    <span className="text-secondary-foreground">LP Fee APR</span>
-                                                    <span className="font-mono font-bold">{lpApr}%</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min="0"
-                                                    max="200"
-                                                    value={lpApr}
-                                                    onChange={(e) => setLpApr(Number(e.target.value))}
-                                                    className="w-full h-2 bg-secondary/50 rounded-full appearance-none cursor-pointer accent-primary"
-                                                />
-                                                <p className="text-[10px] text-secondary-foreground mt-1">
-                                                    Annual percentage rate from LP trading fees
-                                                </p>
-                                            </div>
+                            <div className="p-4 space-y-4">
+                                {/* LP APR */}
+                                <div>
+                                    <div className="flex justify-between text-sm mb-2">
+                                        <span className="text-secondary-foreground">LP Fee APR</span>
+                                        <span className="font-mono font-bold">{lpApr}%</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="200"
+                                        value={lpApr}
+                                        onChange={(e) => setLpApr(Number(e.target.value))}
+                                        className="w-full h-2 bg-secondary/50 rounded-full appearance-none cursor-pointer accent-primary"
+                                    />
+                                    <p className="text-[10px] text-secondary-foreground mt-1">
+                                        Annual percentage rate from LP trading fees
+                                    </p>
+                                </div>
 
-                                            {/* Funding Rate */}
-                                            <div>
-                                                <div className="flex justify-between text-sm mb-2">
-                                                    <span className="text-secondary-foreground">Daily Funding Rate</span>
-                                                    <span className="font-mono font-bold text-destructive">-{fundingRate.toFixed(3)}%</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min="0"
-                                                    max="0.1"
-                                                    step="0.001"
-                                                    value={fundingRate}
-                                                    onChange={(e) => setFundingRate(Number(e.target.value))}
-                                                    className="w-full h-2 bg-secondary/50 rounded-full appearance-none cursor-pointer accent-primary"
-                                                />
-                                                <p className="text-[10px] text-secondary-foreground mt-1">
-                                                    Cost to maintain short hedge position (paid to longs)
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+                                {/* Funding Rate - Now allows positive and negative */}
+                                <div>
+                                    <div className="flex justify-between text-sm mb-2">
+                                        <span className="text-secondary-foreground">Daily Funding Rate</span>
+                                        <span className={`font-mono font-bold ${fundingRate >= 0 ? "text-destructive" : "text-success"}`}>
+                                            {fundingRate >= 0 ? "-" : "+"}{Math.abs(fundingRate).toFixed(3)}%
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="-0.05"
+                                        max="0.1"
+                                        step="0.001"
+                                        value={fundingRate}
+                                        onChange={(e) => setFundingRate(Number(e.target.value))}
+                                        className="w-full h-2 bg-secondary/50 rounded-full appearance-none cursor-pointer accent-primary"
+                                    />
+                                    <p className="text-[10px] text-secondary-foreground mt-1">
+                                        {fundingRate >= 0 
+                                            ? "Cost to maintain short hedge (paid to longs)" 
+                                            : "Earn funding from longs (bull market scenario)"}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </motion.div>
 
@@ -535,8 +516,12 @@ export default function CalculatorPage() {
                                         </span>
                                     </div>
                                     <div className="flex justify-between pl-3">
-                                        <span className="text-secondary-foreground">Funding Cost ({days}d)</span>
-                                        <span className="font-mono text-destructive">-${calculations.totalFundingCost.toFixed(0)}</span>
+                                        <span className="text-secondary-foreground">
+                                            {calculations.totalFundingCost >= 0 ? "Funding Cost" : "Funding Earned"} ({days}d)
+                                        </span>
+                                        <span className={`font-mono ${calculations.totalFundingCost >= 0 ? "text-destructive" : "text-success"}`}>
+                                            {calculations.totalFundingCost >= 0 ? "-" : "+"}${Math.abs(calculations.totalFundingCost).toFixed(0)}
+                                        </span>
                                     </div>
 
                                     {/* Compound Bonus */}

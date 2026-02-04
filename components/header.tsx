@@ -1,9 +1,9 @@
 "use client";
 
 import { ThemeToggle } from "./theme-toggle";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { injected } from "wagmi/connectors";
-import { ShieldCheck, Wallet, Menu } from "lucide-react";
+import { WalletButton } from "./wallet-button";
+import { MobileMenu } from "./mobile-menu";
+import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
@@ -13,17 +13,16 @@ const NAV_ITEMS = [
     { name: "Tokens", href: "/tokens" },
     { name: "Pools", href: "/pools" },
     { name: "Vault", href: "/dashboard" },
+    { name: "Calculator", href: "/calculator" },
 ];
 
 export function Header() {
-    const { address, isConnected } = useAccount();
-    const { connect } = useConnect();
-    const { disconnect } = useDisconnect();
     const pathname = usePathname();
 
     return (
-        <header className="fixed top-0 left-0 right-0 h-16 border-b bg-background/80 backdrop-blur-md z-50 flex items-center justify-between px-6">
-            <div className="flex items-center gap-8">
+        <header className="fixed top-0 left-0 right-0 h-16 border-b bg-background/80 backdrop-blur-md z-50 flex items-center justify-between px-4 sm:px-6">
+            {/* Logo + Nav */}
+            <div className="flex items-center gap-6 lg:gap-8">
                 <Link href="/" className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                         <ShieldCheck className="text-white w-5 h-5" />
@@ -49,31 +48,16 @@ export function Header() {
                 </nav>
             </div>
 
+            {/* Actions */}
             <div className="flex items-center gap-3">
+                {/* Desktop: Theme + Wallet */}
                 <div className="hidden sm:flex items-center gap-3">
                     <ThemeToggle />
-
-                    {isConnected ? (
-                        <button
-                            onClick={() => disconnect()}
-                            className="flex items-center gap-2 px-4 py-2 rounded-full bg-secondary/50 hover:bg-secondary transition-colors text-sm font-medium"
-                        >
-                            <Wallet className="w-4 h-4" />
-                            {address?.slice(0, 6)}...{address?.slice(-4)}
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => connect({ connector: injected() })}
-                            className="px-6 py-2 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity text-sm font-semibold"
-                        >
-                            Connect Wallet
-                        </button>
-                    )}
+                    <WalletButton />
                 </div>
 
-                <button className="lg:hidden p-2 rounded-lg hover:bg-secondary/50">
-                    <Menu className="w-6 h-6" />
-                </button>
+                {/* Mobile: Menu */}
+                <MobileMenu />
             </div>
         </header>
     );

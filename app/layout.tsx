@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "HedgeLP | Delta-Neutral Liquidity Provision",
   description: "Earn LP fees while automatically hedging downside risk using Uniswap v4 Hooks.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

@@ -56,9 +56,45 @@ const TOKEN_COLORS: Record<string, string> = {
 };
 
 function getTokenColor(symbol: string): string {
-    // Extract base symbol (remove chain prefixes, etc.)
-    const baseSymbol = symbol.replace(/^[a-z]+/, "").toUpperCase();
-    return TOKEN_COLORS[baseSymbol] || TOKEN_COLORS[symbol.toUpperCase()] || "#627EEA";
+    return TOKEN_COLORS[symbol] || "#627EEA";
+}
+
+// Helper to get token icon from symbol
+export function getTokenIconFromSymbol(poolSymbol: string): { token1Icon: string; token2Icon: string } {
+    // Pool symbols are typically "TOKEN1/TOKEN2" or "TOKEN1-TOKEN2"
+    const tokens = poolSymbol.split(/[/-]/).map(t => t.trim());
+    const token1 = tokens[0] || "ETH";
+    const token2 = tokens[1] || "USDC";
+
+    // Import from market data hook
+    const getIconUrl = (symbol: string) => {
+        const TOKEN_ICONS: Record<string, string> = {
+            "ETH": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/eth.svg",
+            "WETH": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/eth.svg",
+            "USDC": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+            "USDT": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+            "DAI": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/dai.svg",
+            "WBTC": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/btc.svg",
+            "UNI": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/uni.svg",
+            "LINK": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/link.svg",
+            "ARB": "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/arbitrum.svg",
+            "OP": "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/optimism.svg",
+            "AAVE": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/aave.svg",
+            "SOL": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/sol.svg",
+            "MATIC": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/matic.svg",
+            "WISE": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/sol.svg",
+            "USDE": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+            "CRV": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/crv.svg",
+            "MKR": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/mkr.svg",
+        };
+        const color = getTokenColor(symbol);
+        return TOKEN_ICONS[symbol] || `https://via.placeholder.com/40/${color.slice(1)}/ffffff?text=${symbol}`;
+    };
+
+    return {
+        token1Icon: getIconUrl(token1),
+        token2Icon: getIconUrl(token2)
+    };
 }
 
 // ============ API Routes (proxied to avoid CORS) ============
@@ -73,26 +109,26 @@ export function useUniswapPools(chain: string = "Ethereum") {
         queryFn: async () => {
             try {
                 const response = await fetch(API_BASE);
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     throw new Error(data.error);
                 }
-                
+
                 // Filter for Uniswap pools on specified chain
                 const uniswapPools = data.data
-                    .filter((pool: any) => 
+                    .filter((pool: any) =>
                         pool.project.toLowerCase().includes("uniswap") &&
                         (chain === "all" || pool.chain.toLowerCase() === chain.toLowerCase())
                     )
                     .slice(0, 20)
                     .map((pool: any) => transformPool(pool));
-                
+
                 return uniswapPools.length > 0 ? uniswapPools : getFallbackPools();
             } catch (error) {
                 console.error("Failed to fetch Uniswap pools:", error);
@@ -113,29 +149,29 @@ export function useTopPools(limit: number = 10) {
         queryFn: async () => {
             try {
                 const response = await fetch(API_BASE);
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     throw new Error(data.error);
                 }
-                
+
                 // Get top pools by TVL (Uniswap + Curve + Aave)
                 const topPools = data.data
-                    .filter((pool: any) => 
+                    .filter((pool: any) =>
                         (pool.project.toLowerCase().includes("uniswap") ||
-                         pool.project.toLowerCase().includes("curve") ||
-                         pool.project.toLowerCase().includes("aave")) &&
+                            pool.project.toLowerCase().includes("curve") ||
+                            pool.project.toLowerCase().includes("aave")) &&
                         pool.tvlUsd > 1000000 // Min $1M TVL
                     )
                     .sort((a: any, b: any) => b.tvlUsd - a.tvlUsd)
                     .slice(0, limit)
                     .map((pool: any) => transformPool(pool));
-                
+
                 return topPools.length > 0 ? topPools : getFallbackPools();
             } catch (error) {
                 console.error("Failed to fetch top pools:", error);
@@ -155,29 +191,29 @@ export function useRewardPools(limit: number = 5) {
         queryFn: async () => {
             try {
                 const response = await fetch(API_BASE);
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     throw new Error(data.error);
                 }
-                
+
                 // Get pools with reward APY
                 const rewardPools = data.data
-                    .filter((pool: any) => 
+                    .filter((pool: any) =>
                         pool.apyReward > 0 &&
                         pool.tvlUsd > 500000 &&
                         (pool.project.toLowerCase().includes("uniswap") ||
-                         pool.project.toLowerCase().includes("curve"))
+                            pool.project.toLowerCase().includes("curve"))
                     )
                     .sort((a: any, b: any) => b.apyReward - a.apyReward)
                     .slice(0, limit)
                     .map((pool: any) => transformPool(pool));
-                
+
                 return rewardPools.length > 0 ? rewardPools : getFallbackRewardPools();
             } catch (error) {
                 console.error("Failed to fetch reward pools:", error);
@@ -197,26 +233,26 @@ export function usePoolStats() {
         queryFn: async () => {
             try {
                 const response = await fetch(API_BASE);
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     throw new Error(data.error);
                 }
-                
+
                 // Calculate stats for Uniswap pools
-                const uniswapPools = data.data.filter((pool: any) => 
+                const uniswapPools = data.data.filter((pool: any) =>
                     pool.project.toLowerCase().includes("uniswap")
                 );
-                
+
                 const totalTvl = uniswapPools.reduce((sum: number, pool: any) => sum + (pool.tvlUsd || 0), 0);
                 const totalVolume = uniswapPools.reduce((sum: number, pool: any) => sum + (pool.volumeUsd1d || 0), 0);
                 const avgApy = uniswapPools.reduce((sum: number, pool: any) => sum + (pool.apy || 0), 0) / uniswapPools.length;
-                
+
                 return {
                     totalTvl,
                     totalVolume24h: totalVolume || totalTvl * 0.02, // Estimate if not available
@@ -246,12 +282,12 @@ function transformPool(pool: any): Pool {
     const tokens = symbol.split("-").map((s: string) => s.trim().toUpperCase());
     const token1 = tokens[0] || "ETH";
     const token2 = tokens[1] || "USDC";
-    
+
     // Determine version from project name
     let version = "v2";
     if (pool.project.toLowerCase().includes("v3")) version = "v3";
     else if (pool.project.toLowerCase().includes("v4")) version = "v4";
-    
+
     // Parse fee from pool metadata
     let fee = "0.3%";
     if (pool.poolMeta) {
@@ -261,7 +297,7 @@ function transformPool(pool: any): Pool {
             fee = feeValue < 1 ? `${feeValue}%` : `${(feeValue / 10000).toFixed(4)}%`;
         }
     }
-    
+
     return {
         id: pool.pool,
         name: `${token1} / ${token2}`,

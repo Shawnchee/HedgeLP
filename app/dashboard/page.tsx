@@ -63,7 +63,7 @@ function generatePerformanceData(depositedAmount: number, currentValue: number) 
     const steps = 7;
     const data = [];
     const pnl = currentValue - depositedAmount;
-    
+
     for (let i = 0; i <= steps; i++) {
         const progress = i / steps;
         // Add some variance to make it look realistic
@@ -81,19 +81,19 @@ function generatePerformanceData(depositedAmount: number, currentValue: number) 
 function createNewPosition(depositAmount: number): UserPosition {
     const lpAllocation = 0.8;
     const hedgeAllocation = 0.2;
-    
+
     // Small initial PnL (slight loss due to fees, or neutral)
     const initialPnlPercent = -0.05 + Math.random() * 0.1; // -0.05% to +0.05%
     const totalPnl = depositAmount * (initialPnlPercent / 100);
     const totalValue = depositAmount + totalPnl;
-    
+
     const lpValue = totalValue * lpAllocation;
     const hedgeValue = totalValue * hedgeAllocation;
-    
+
     // Individual position PnLs
     const lpPnlPercent = -0.02 + Math.random() * 0.04; // Slight variance
     const hedgePnlPercent = -0.08 + Math.random() * 0.1; // Hedge can have more variance
-    
+
     return {
         hasPosition: true,
         depositedAmount: depositAmount,
@@ -101,9 +101,9 @@ function createNewPosition(depositAmount: number): UserPosition {
         shares: Math.floor(depositAmount / 10), // 1 share = $10
         allocation: { lp: 80, hedge: 20 },
         estimatedAPR: 18.4,
-        pnl: { 
-            value: totalPnl, 
-            percentage: initialPnlPercent 
+        pnl: {
+            value: totalPnl,
+            percentage: initialPnlPercent
         },
         lpPosition: {
             pool: "ETH / USDC",
@@ -133,24 +133,24 @@ function createNewPosition(depositAmount: number): UserPosition {
 function updatePositionPnL(position: UserPosition): UserPosition {
     const elapsed = Date.now() - position.depositTime;
     const hours = elapsed / (1000 * 60 * 60);
-    
+
     // Simulate PnL growth over time (small daily variance)
     const dailyRate = position.estimatedAPR / 365 / 100;
     const expectedReturn = position.depositedAmount * dailyRate * (hours / 24);
     const variance = (Math.random() - 0.5) * expectedReturn * 0.5;
-    
+
     const totalPnl = expectedReturn + variance;
     const totalValue = position.depositedAmount + totalPnl;
     const pnlPercent = (totalPnl / position.depositedAmount) * 100;
-    
+
     const lpValue = totalValue * 0.8;
     const hedgeValue = totalValue * 0.2;
-    
+
     // LP position tends to gain from fees
     const lpPnlPercent = pnlPercent * 1.1 + (Math.random() - 0.5) * 0.1;
     // Hedge position has funding costs but provides protection
     const hedgePnlPercent = pnlPercent * 0.6 + (Math.random() - 0.5) * 0.2;
-    
+
     return {
         ...position,
         totalValue,
@@ -177,14 +177,14 @@ function updatePositionPnL(position: UserPosition): UserPosition {
 export default function DashboardPage() {
     const { address, isConnected } = useAccount();
     const { data: balance } = useBalance({ address });
-    
+
     const [activeTab, setActiveTab] = useState<"deposit" | "withdraw">("deposit");
     const [inputAmount, setInputAmount] = useState("");
     const [showPreviewModal, setShowPreviewModal] = useState(false);
-    
+
     // Track user position (persisted in localStorage for demo)
     const [userPosition, setUserPosition] = useState<UserPosition | null>(null);
-    
+
     // Load position from localStorage on mount
     useEffect(() => {
         if (isConnected && address) {
@@ -196,15 +196,15 @@ export default function DashboardPage() {
             }
         }
     }, [isConnected, address]);
-    
+
     // Update PnL periodically (every 30 seconds)
     useEffect(() => {
         if (!userPosition) return;
-        
+
         const interval = setInterval(() => {
             setUserPosition(prev => prev ? updatePositionPnL(prev) : null);
         }, 30000);
-        
+
         return () => clearInterval(interval);
     }, [userPosition?.depositTime]);
 
@@ -213,7 +213,7 @@ export default function DashboardPage() {
         onSuccess: () => {
             const amount = parseFloat(inputAmount);
             // Create or update position
-            const newPosition = userPosition 
+            const newPosition = userPosition
                 ? {
                     ...userPosition,
                     depositedAmount: userPosition.depositedAmount + amount,
@@ -229,7 +229,7 @@ export default function DashboardPage() {
                     }
                 }
                 : createNewPosition(amount);
-            
+
             setUserPosition(newPosition);
             // Persist to localStorage
             if (address) {
@@ -239,13 +239,13 @@ export default function DashboardPage() {
             setInputAmount("");
         }
     });
-    
+
     const withdrawTx = useMockWithdraw({
         onSuccess: () => {
             const amount = parseFloat(inputAmount);
             if (userPosition) {
                 const remainingRatio = Math.max(0, (userPosition.totalValue - amount) / userPosition.totalValue);
-                
+
                 if (remainingRatio <= 0.01) {
                     // Full withdrawal
                     setUserPosition(null);
@@ -290,11 +290,11 @@ export default function DashboardPage() {
             setInputAmount("");
         }
     });
-    
+
     const isProcessing = depositTx.isLoading || withdrawTx.isLoading;
 
     const parsedAmount = parseFloat(inputAmount) || 0;
-    
+
     // Generate performance chart data
     const performanceData = useMemo(() => {
         if (!userPosition) return [];
@@ -309,7 +309,7 @@ export default function DashboardPage() {
 
     const handleConfirmTrade = async (settings: TradeSettings) => {
         console.log("Trade settings:", settings);
-        
+
         // Use mock transaction with real wallet signing
         if (activeTab === "deposit") {
             await depositTx.deposit(inputAmount);
@@ -323,7 +323,7 @@ export default function DashboardPage() {
         return (
             <main className="min-h-screen pt-16 bg-background text-foreground selection:bg-primary/30">
                 <Header />
-                
+
                 <div className="max-w-2xl mx-auto p-6 pt-24 text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -338,7 +338,7 @@ export default function DashboardPage() {
                             Connect your wallet to view your HedgeLP position, deposit funds, and start earning yield with automated hedging.
                         </p>
                         <WalletButton />
-                        
+
                         <div className="mt-12 pt-8 border-t">
                             <h3 className="text-lg font-bold mb-6">Why HedgeLP?</h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
@@ -418,9 +418,8 @@ export default function DashboardPage() {
                                     ${(userPosition?.totalValue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </h3>
                                 {userPosition ? (
-                                    <div className={`flex items-center gap-1 mt-1 text-sm font-semibold ${
-                                        (userPosition.pnl.percentage) >= 0 ? 'text-success' : 'text-destructive'
-                                    }`}>
+                                    <div className={`flex items-center gap-1 mt-1 text-sm font-semibold ${(userPosition.pnl.percentage) >= 0 ? 'text-success' : 'text-destructive'
+                                        }`}>
                                         {(userPosition.pnl.percentage) >= 0 ? (
                                             <ArrowUpRight className="w-4 h-4" />
                                         ) : (
@@ -517,39 +516,39 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                             ) : (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={performanceData}>
-                                    <defs>
-                                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#FF007A" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#FF007A" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <XAxis dataKey="time" hide />
-                                    <YAxis hide domain={['dataMin - 100', 'dataMax + 100']} />
-                                    <Tooltip
-                                        content={({ active, payload }) => {
-                                            if (active && payload && payload.length) {
-                                                return (
-                                                    <div className="bg-popover border p-2 rounded-lg shadow-xl outline-none">
-                                                        <p className="text-sm font-mono font-bold">${payload[0].value}</p>
-                                                        <p className="text-[10px] text-secondary-foreground uppercase font-semibold">{payload[0].payload.time}</p>
-                                                    </div>
-                                                );
-                                            }
-                                            return null;
-                                        }}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="value"
-                                        stroke="#FF007A"
-                                        strokeWidth={2}
-                                        fillOpacity={1}
-                                        fill="url(#colorValue)"
-                                    />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={performanceData}>
+                                        <defs>
+                                            <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#FF007A" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#FF007A" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <XAxis dataKey="time" hide />
+                                        <YAxis hide domain={['dataMin - 100', 'dataMax + 100']} />
+                                        <Tooltip
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    return (
+                                                        <div className="bg-popover border p-2 rounded-lg shadow-xl outline-none">
+                                                            <p className="text-sm font-mono font-bold">${payload[0].value}</p>
+                                                            <p className="text-[10px] text-secondary-foreground uppercase font-semibold">{payload[0].payload.time}</p>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="value"
+                                            stroke="#FF007A"
+                                            strokeWidth={2}
+                                            fillOpacity={1}
+                                            fill="url(#colorValue)"
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
                             )}
                         </div>
                     </motion.section>
@@ -576,7 +575,7 @@ export default function DashboardPage() {
                                 <Info className="w-4 h-4 text-secondary-foreground cursor-pointer" />
                             </div>
                         </div>
-                        
+
                         {/* No Position State */}
                         {!userPosition && (
                             <div className="p-8 text-center">
@@ -603,117 +602,130 @@ export default function DashboardPage() {
                                 </div>
                             </div>
                         )}
-                        
+
                         {/* Positions List */}
                         {userPosition && (
-                        <>
-                        <div className="divide-y">
-                            {/* LP Position */}
-                            <div className="p-4 flex items-center justify-between hover:bg-secondary/10 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="flex -space-x-2">
-                                        <div className="w-8 h-8 rounded-full bg-blue-500 border-2 border-card flex items-center justify-center">
-                                            <Droplets className="w-4 h-4 text-white" />
-                                        </div>
-                                        <div className="w-8 h-8 rounded-full bg-green-500 border-2 border-card" />
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-sm">{userPosition?.lpPosition.pool}</div>
-                                        <div className="text-secondary-foreground text-[10px] font-bold uppercase tracking-wider">
-                                            {userPosition?.lpPosition.protocol} • {userPosition?.lpPosition.fee} fee
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-mono font-bold">
-                                        ${userPosition?.lpPosition.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </div>
-                                    <div className="flex items-center justify-end gap-2">
-                                        <span className="text-[10px] text-primary font-semibold">
-                                            {userPosition?.lpPosition.allocation}% Allocated
-                                        </span>
-                                        <span className={`text-[10px] font-bold ${
-                                            (userPosition?.lpPosition.pnl?.percentage ?? 0) >= 0 ? 'text-success' : 'text-destructive'
-                                        }`}>
-                                            {(userPosition?.lpPosition.pnl?.percentage ?? 0) >= 0 ? '+' : ''}{(userPosition?.lpPosition.pnl?.percentage ?? 0).toFixed(2)}%
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Hedge Position */}
-                            <div className="p-4 flex items-center justify-between hover:bg-secondary/10 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center border-2 border-card">
-                                        <Shield className="w-4 h-4 text-success" />
-                                    </div>
-                                    <div>
-                                        <div className="font-bold text-sm">{userPosition?.hedgePosition.type}</div>
-                                        <div className="text-secondary-foreground text-[10px] font-bold uppercase tracking-wider">
-                                            {userPosition?.hedgePosition.protocol}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-mono font-bold">
-                                        ${userPosition?.hedgePosition.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </div>
-                                    <div className="flex items-center justify-end gap-2">
-                                        <span className={`text-[10px] font-bold ${
-                                            (userPosition?.hedgePosition.pnl?.value ?? 0) >= 0 ? 'text-success' : 'text-destructive'
-                                        }`}>
-                                            {(userPosition?.hedgePosition.pnl?.value ?? 0) >= 0 ? '+' : ''}${(userPosition?.hedgePosition.pnl?.value ?? 0).toFixed(2)}
-                                        </span>
-                                        <span className={`text-[10px] font-bold ${
-                                            (userPosition?.hedgePosition.pnl?.percentage ?? 0) >= 0 ? 'text-success' : 'text-destructive'
-                                        }`}>
-                                            ({(userPosition?.hedgePosition.pnl?.percentage ?? 0) >= 0 ? '+' : ''}{(userPosition?.hedgePosition.pnl?.percentage ?? 0).toFixed(2)}%)
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            {/* Portfolio PnL Summary */}
-                            <div className="p-4 bg-gradient-to-r from-primary/5 to-transparent border-t">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <div className="text-xs text-secondary-foreground font-medium mb-1">Portfolio P&L</div>
+                            <>
+                                <div className="divide-y">
+                                    {/* LP Position */}
+                                    <div className="p-4 flex items-center justify-between hover:bg-secondary/10 transition-colors">
                                         <div className="flex items-center gap-3">
-                                            <span className={`text-lg font-mono font-bold ${
-                                                (userPosition?.pnl.value ?? 0) >= 0 ? 'text-success' : 'text-destructive'
-                                            }`}>
-                                                {(userPosition?.pnl.value ?? 0) >= 0 ? '+' : ''}${(userPosition?.pnl.value ?? 0).toFixed(2)}
-                                            </span>
-                                            <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${
-                                                (userPosition?.pnl.percentage ?? 0) >= 0 
-                                                    ? 'text-success bg-success/10' 
-                                                    : 'text-destructive bg-destructive/10'
-                                            }`}>
-                                                {(userPosition?.pnl.percentage ?? 0) >= 0 ? '+' : ''}{(userPosition?.pnl.percentage ?? 0).toFixed(2)}%
-                                            </span>
+                                            <div className="flex -space-x-2">
+                                                <img
+                                                    src="https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/eth.svg"
+                                                    alt="ETH"
+                                                    className="w-8 h-8 rounded-full border-2 border-card z-10"
+                                                    onError={(e) => {
+                                                        e.currentTarget.style.display = 'none';
+                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                                    }}
+                                                />
+                                                <div className="w-8 h-8 rounded-full bg-blue-500 border-2 border-card flex items-center justify-center z-10 hidden">
+                                                    <Droplets className="w-4 h-4 text-white" />
+                                                </div>
+                                                <img
+                                                    src="https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png"
+                                                    alt="USDC"
+                                                    className="w-8 h-8 rounded-full border-2 border-card"
+                                                    onError={(e) => {
+                                                        e.currentTarget.style.display = 'none';
+                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                                    }}
+                                                />
+                                                <div className="w-8 h-8 rounded-full bg-green-500 border-2 border-card hidden" />
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-sm">{userPosition?.lpPosition.pool}</div>
+                                                <div className="text-secondary-foreground text-[10px] font-bold uppercase tracking-wider">
+                                                    {userPosition?.lpPosition.protocol} • {userPosition?.lpPosition.fee} fee
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-sm font-mono font-bold">
+                                                ${userPosition?.lpPosition.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <span className="text-[10px] text-primary font-semibold">
+                                                    {userPosition?.lpPosition.allocation}% Allocated
+                                                </span>
+                                                <span className={`text-[10px] font-bold ${(userPosition?.lpPosition.pnl?.percentage ?? 0) >= 0 ? 'text-success' : 'text-destructive'
+                                                    }`}>
+                                                    {(userPosition?.lpPosition.pnl?.percentage ?? 0) >= 0 ? '+' : ''}{(userPosition?.lpPosition.pnl?.percentage ?? 0).toFixed(2)}%
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-xs text-secondary-foreground font-medium mb-1">Deposited</div>
-                                        <div className="text-sm font-mono font-bold">
-                                            ${(userPosition?.depositedAmount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+
+                                    {/* Hedge Position */}
+                                    <div className="p-4 flex items-center justify-between hover:bg-secondary/10 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center border-2 border-card">
+                                                <Shield className="w-4 h-4 text-success" />
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-sm">{userPosition?.hedgePosition.type}</div>
+                                                <div className="text-secondary-foreground text-[10px] font-bold uppercase tracking-wider">
+                                                    {userPosition?.hedgePosition.protocol}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-sm font-mono font-bold">
+                                                ${userPosition?.hedgePosition.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <span className={`text-[10px] font-bold ${(userPosition?.hedgePosition.pnl?.value ?? 0) >= 0 ? 'text-success' : 'text-destructive'
+                                                    }`}>
+                                                    {(userPosition?.hedgePosition.pnl?.value ?? 0) >= 0 ? '+' : ''}${(userPosition?.hedgePosition.pnl?.value ?? 0).toFixed(2)}
+                                                </span>
+                                                <span className={`text-[10px] font-bold ${(userPosition?.hedgePosition.pnl?.percentage ?? 0) >= 0 ? 'text-success' : 'text-destructive'
+                                                    }`}>
+                                                    ({(userPosition?.hedgePosition.pnl?.percentage ?? 0) >= 0 ? '+' : ''}{(userPosition?.hedgePosition.pnl?.percentage ?? 0).toFixed(2)}%)
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Portfolio PnL Summary */}
+                                    <div className="p-4 bg-gradient-to-r from-primary/5 to-transparent border-t">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <div className="text-xs text-secondary-foreground font-medium mb-1">Portfolio P&L</div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`text-lg font-mono font-bold ${(userPosition?.pnl.value ?? 0) >= 0 ? 'text-success' : 'text-destructive'
+                                                        }`}>
+                                                        {(userPosition?.pnl.value ?? 0) >= 0 ? '+' : ''}${(userPosition?.pnl.value ?? 0).toFixed(2)}
+                                                    </span>
+                                                    <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${(userPosition?.pnl.percentage ?? 0) >= 0
+                                                            ? 'text-success bg-success/10'
+                                                            : 'text-destructive bg-destructive/10'
+                                                        }`}>
+                                                        {(userPosition?.pnl.percentage ?? 0) >= 0 ? '+' : ''}{(userPosition?.pnl.percentage ?? 0).toFixed(2)}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-xs text-secondary-foreground font-medium mb-1">Deposited</div>
+                                                <div className="text-sm font-mono font-bold">
+                                                    ${(userPosition?.depositedAmount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        {/* Position Summary Footer */}
-                        <div className="p-4 bg-secondary/10 border-t flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <ShieldCheck className="w-4 h-4 text-primary" />
-                                <span className="text-xs font-bold">Delta Neutral Strategy Active</span>
-                            </div>
-                            <div className="text-xs text-secondary-foreground">
-                                Last rebalance: 2 hours ago
-                            </div>
-                        </div>
-                        </>
+
+                                {/* Position Summary Footer */}
+                                <div className="p-4 bg-secondary/10 border-t flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <ShieldCheck className="w-4 h-4 text-primary" />
+                                        <span className="text-xs font-bold">Delta Neutral Strategy Active</span>
+                                    </div>
+                                    <div className="text-xs text-secondary-foreground">
+                                        Last rebalance: 2 hours ago
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </motion.section>
 
@@ -782,7 +794,12 @@ export default function DashboardPage() {
                                         className="bg-transparent border-none outline-none text-2xl font-mono p-0 w-full"
                                     />
                                     <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-full cursor-pointer hover:bg-secondary transition-colors">
-                                        <div className="w-5 h-5 rounded-full bg-green-500" />
+                                        <img
+                                            src="https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png"
+                                            alt="USDC"
+                                            className="w-5 h-5 rounded-full"
+                                            onError={(e) => e.currentTarget.style.backgroundColor = '#2775CA'}
+                                        />
                                         <span className="font-bold text-sm uppercase">USDC</span>
                                     </div>
                                 </div>

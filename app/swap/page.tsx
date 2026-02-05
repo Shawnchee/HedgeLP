@@ -16,20 +16,21 @@ interface Token {
     balance: string;
     color: string;
     decimals: number;
+    image?: string;
 }
 
 // Token list with CoinGecko IDs for real prices
 const SWAP_TOKENS: Token[] = [
-    { id: "ethereum", symbol: "ETH", name: "Ethereum", balance: "1.24", color: "#627EEA", decimals: 18 },
-    { id: "usd-coin", symbol: "USDC", name: "USD Coin", balance: "2,450.00", color: "#2775CA", decimals: 6 },
-    { id: "tether", symbol: "USDT", name: "Tether", balance: "500.00", color: "#26A17B", decimals: 6 },
-    { id: "dai", symbol: "DAI", name: "Dai", balance: "120.00", color: "#F5AC37", decimals: 18 },
-    { id: "uniswap", symbol: "UNI", name: "Uniswap", balance: "0.00", color: "#FF007A", decimals: 18 },
-    { id: "wrapped-bitcoin", symbol: "WBTC", name: "Wrapped Bitcoin", balance: "0.05", color: "#F7931A", decimals: 8 },
-    { id: "chainlink", symbol: "LINK", name: "Chainlink", balance: "25.00", color: "#375BD2", decimals: 18 },
-    { id: "arbitrum", symbol: "ARB", name: "Arbitrum", balance: "150.00", color: "#28A0F0", decimals: 18 },
-    { id: "optimism", symbol: "OP", name: "Optimism", balance: "0.00", color: "#FF0420", decimals: 18 },
-    { id: "aave", symbol: "AAVE", name: "Aave", balance: "0.00", color: "#B6509E", decimals: 18 },
+    { id: "ethereum", symbol: "ETH", name: "Ethereum", balance: "1.24", color: "#627EEA", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/eth.svg" },
+    { id: "usd-coin", symbol: "USDC", name: "USD Coin", balance: "2,450.00", color: "#2775CA", decimals: 6, image: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png" },
+    { id: "tether", symbol: "USDT", name: "Tether", balance: "500.00", color: "#26A17B", decimals: 6, image: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png" },
+    { id: "dai", symbol: "DAI", name: "Dai", balance: "120.00", color: "#F5AC37", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/dai.svg" },
+    { id: "uniswap", symbol: "UNI", name: "Uniswap", balance: "0.00", color: "#FF007A", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/uni.svg" },
+    { id: "wrapped-bitcoin", symbol: "WBTC", name: "Wrapped Bitcoin", balance: "0.05", color: "#F7931A", decimals: 8, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/btc.svg" },
+    { id: "chainlink", symbol: "LINK", name: "Chainlink", balance: "25.00", color: "#375BD2", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/link.svg" },
+    { id: "arbitrum", symbol: "ARB", name: "Arbitrum", balance: "150.00", color: "#28A0F0", decimals: 18, image: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/arbitrum.svg" },
+    { id: "optimism", symbol: "OP", name: "Optimism", balance: "0.00", color: "#FF0420", decimals: 18, image: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/optimism.svg" },
+    { id: "aave", symbol: "AAVE", name: "Aave", balance: "0.00", color: "#B6509E", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/aave.svg" },
 ];
 
 type SwapStep = "idle" | "confirming" | "signing" | "pending" | "success" | "error";
@@ -44,23 +45,23 @@ export default function SwapPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [slippage, setSlippage] = useState(0.5);
     const [showSettings, setShowSettings] = useState(false);
-    
+
     // Mock transaction hook for genuine wallet signing
-    const { 
-        swap, 
-        status: swapStatus, 
-        txHash, 
-        error: swapError, 
+    const {
+        swap,
+        status: swapStatus,
+        txHash,
+        error: swapError,
         reset: resetSwap,
         isLoading: swapLoading,
-        isRejected 
+        isRejected
     } = useMockSwap({
         onSuccess: () => {
             // Clear form on success
             setSellAmount("");
         }
     });
-    
+
     // Map status to swapStep for backward compatibility
     const swapStep: SwapStep = swapStatus === "rejected" ? "error" : swapStatus;
     const errorMessage = isRejected ? "Transaction cancelled by user" : swapError;
@@ -68,7 +69,7 @@ export default function SwapPage() {
     // Fetch real prices
     const { data: tokenPrices, isLoading: pricesLoading } = useTokenPrices();
     const { data: exchangeRate, isLoading: rateLoading, refetch: refetchRate } = useExchangeRate(
-        sellToken.id, 
+        sellToken.id,
         buyToken?.id || ""
     );
 
@@ -143,7 +144,7 @@ export default function SwapPage() {
     // Handle swap with genuine wallet signing
     const handleSwap = async () => {
         if (!isConnected || !buyToken || !sellAmount || parseFloat(sellAmount) <= 0) return;
-        
+
         // Use mock swap hook which triggers real wallet signing
         await swap({
             fromToken: sellToken.symbol,
@@ -185,7 +186,7 @@ export default function SwapPage() {
                             {rateLoading && (
                                 <Loader2 className="w-3 h-3 animate-spin text-primary" />
                             )}
-                            <button 
+                            <button
                                 onClick={() => setShowSettings(!showSettings)}
                                 className={`p-1.5 rounded-lg transition-colors ${showSettings ? 'bg-secondary' : 'hover:bg-secondary/50'}`}
                             >
@@ -212,9 +213,8 @@ export default function SwapPage() {
                                         <button
                                             key={s}
                                             onClick={() => setSlippage(s)}
-                                            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${
-                                                slippage === s ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 hover:bg-secondary'
-                                            }`}
+                                            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${slippage === s ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 hover:bg-secondary'
+                                                }`}
                                         >
                                             {s}%
                                         </button>
@@ -238,7 +238,7 @@ export default function SwapPage() {
                         <div className="p-4 rounded-2xl bg-secondary/20 border-none group focus-within:ring-1 focus-within:ring-primary/20 transition-all">
                             <div className="flex justify-between mb-2">
                                 <span className="text-sm font-bold text-secondary-foreground">Sell</span>
-                                <button 
+                                <button
                                     onClick={() => setSellAmount(sellToken.balance.replace(/,/g, ''))}
                                     className="text-xs font-bold text-primary hover:underline"
                                 >
@@ -260,7 +260,7 @@ export default function SwapPage() {
                                     onClick={() => setTokenSelectMode("sell")}
                                     className="flex items-center gap-2 bg-secondary/50 hover:bg-secondary px-3 py-2 rounded-2xl transition-colors shrink-0"
                                 >
-                                    <div className="w-6 h-6 rounded-full" style={{ backgroundColor: sellToken.color }} />
+                                    <img src={sellToken.image} alt={sellToken.symbol} className="w-6 h-6 rounded-full" onError={(e) => e.currentTarget.style.backgroundColor = sellToken.color} />
                                     <span className="font-bold">{sellToken.symbol}</span>
                                     <ChevronDown className="w-4 h-4" />
                                 </button>
@@ -308,15 +308,14 @@ export default function SwapPage() {
                                 </div>
                                 <button
                                     onClick={() => setTokenSelectMode("buy")}
-                                    className={`flex items-center gap-2 px-3 py-2 rounded-2xl transition-all shrink-0 ${
-                                        buyToken 
-                                            ? 'bg-secondary/50 hover:bg-secondary' 
-                                            : 'bg-primary text-primary-foreground hover:opacity-90'
-                                    }`}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-2xl transition-all shrink-0 ${buyToken
+                                        ? 'bg-secondary/50 hover:bg-secondary'
+                                        : 'bg-primary text-primary-foreground hover:opacity-90'
+                                        }`}
                                 >
                                     {buyToken ? (
                                         <>
-                                            <div className="w-6 h-6 rounded-full" style={{ backgroundColor: buyToken.color }} />
+                                            <img src={buyToken.image} alt={buyToken.symbol} className="w-6 h-6 rounded-full" onError={(e) => e.currentTarget.style.backgroundColor = buyToken.color} />
                                             <span className="font-bold">{buyToken.symbol}</span>
                                         </>
                                     ) : (
@@ -371,21 +370,21 @@ export default function SwapPage() {
                             <WalletButton />
                         </div>
                     ) : !buyToken ? (
-                        <button 
+                        <button
                             className="w-full mt-4 py-4 rounded-2xl bg-secondary/50 text-secondary-foreground font-bold text-lg cursor-not-allowed"
                             disabled
                         >
                             Select a token
                         </button>
                     ) : !sellAmount || parseFloat(sellAmount) <= 0 ? (
-                        <button 
+                        <button
                             className="w-full mt-4 py-4 rounded-2xl bg-secondary/50 text-secondary-foreground font-bold text-lg cursor-not-allowed"
                             disabled
                         >
                             Enter an amount
                         </button>
                     ) : (
-                        <button 
+                        <button
                             onClick={handleSwap}
                             disabled={swapStep !== "idle"}
                             className="w-full mt-4 py-4 rounded-2xl bg-primary text-primary-foreground font-bold text-lg hover:opacity-90 transition-all disabled:opacity-50"
@@ -439,8 +438,8 @@ export default function SwapPage() {
                                 <h3 className="text-xl font-bold">
                                     Select a token to {tokenSelectMode}
                                 </h3>
-                                <button 
-                                    onClick={() => setTokenSelectMode(null)} 
+                                <button
+                                    onClick={() => setTokenSelectMode(null)}
                                     className="text-secondary-foreground hover:text-foreground"
                                 >
                                     ✕
@@ -456,67 +455,65 @@ export default function SwapPage() {
                                     className="w-full pl-10 pr-4 py-3 bg-secondary/30 rounded-2xl outline-none focus:ring-1 focus:ring-primary transition-all"
                                 />
                             </div>
-                            
+
                             {/* Popular tokens */}
                             <div className="flex flex-wrap gap-2 mb-6">
                                 {SWAP_TOKENS.slice(0, 6).map((t) => {
-                                    const isSelected = tokenSelectMode === "sell" 
-                                        ? t.symbol === sellToken.symbol 
+                                    const isSelected = tokenSelectMode === "sell"
+                                        ? t.symbol === sellToken.symbol
                                         : t.symbol === buyToken?.symbol;
-                                    const isDisabled = tokenSelectMode === "sell" 
-                                        ? t.symbol === buyToken?.symbol 
+                                    const isDisabled = tokenSelectMode === "sell"
+                                        ? t.symbol === buyToken?.symbol
                                         : t.symbol === sellToken.symbol;
-                                    
+
                                     const tokenPrice = getTokenPrice(t.id);
-                                    
+
                                     return (
-                                        <button 
-                                            key={t.symbol} 
+                                        <button
+                                            key={t.symbol}
                                             onClick={() => !isDisabled && handleSelectToken(t)}
                                             disabled={isDisabled}
-                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-colors ${
-                                                isSelected 
-                                                    ? 'bg-primary/10 border-primary' 
-                                                    : isDisabled 
-                                                        ? 'opacity-40 cursor-not-allowed' 
-                                                        : 'hover:bg-secondary/50'
-                                            }`}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-colors ${isSelected
+                                                ? 'bg-primary/10 border-primary'
+                                                : isDisabled
+                                                    ? 'opacity-40 cursor-not-allowed'
+                                                    : 'hover:bg-secondary/50'
+                                                }`}
                                         >
-                                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.color }} />
+                                            <img src={t.image} alt={t.symbol} className="w-4 h-4 rounded-full" onError={(e) => e.currentTarget.style.backgroundColor = t.color} />
                                             <span className="font-bold text-xs">{t.symbol}</span>
                                         </button>
                                     );
                                 })}
                             </div>
-                            
+
                             {/* Token list */}
                             <div className="space-y-1 -mx-2 max-h-[300px] overflow-y-auto pr-2">
                                 {filteredTokens.map((token) => {
-                                    const isSelected = tokenSelectMode === "sell" 
-                                        ? token.symbol === sellToken.symbol 
+                                    const isSelected = tokenSelectMode === "sell"
+                                        ? token.symbol === sellToken.symbol
                                         : token.symbol === buyToken?.symbol;
-                                    const isOtherSide = tokenSelectMode === "sell" 
-                                        ? token.symbol === buyToken?.symbol 
+                                    const isOtherSide = tokenSelectMode === "sell"
+                                        ? token.symbol === buyToken?.symbol
                                         : token.symbol === sellToken.symbol;
-                                    
+
                                     const tokenPrice = getTokenPrice(token.id);
-                                    
+
                                     return (
                                         <motion.button
                                             key={token.symbol}
                                             onClick={() => handleSelectToken(token)}
                                             whileHover={{ scale: 1.01 }}
                                             whileTap={{ scale: 0.99 }}
-                                            className={`w-full flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
-                                                isSelected 
-                                                    ? 'bg-primary/10 border border-primary' 
-                                                    : isOtherSide
-                                                        ? 'opacity-50 hover:bg-secondary/20'
-                                                        : 'hover:bg-secondary/30'
-                                            }`}
+                                            className={`w-full flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${isSelected
+                                                ? 'bg-primary/10 border border-primary'
+                                                : isOtherSide
+                                                    ? 'opacity-50 hover:bg-secondary/20'
+                                                    : 'hover:bg-secondary/30'
+                                                }`}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-full" style={{ backgroundColor: token.color }} />
+                                                <img src={token.image} alt={token.symbol} className="w-9 h-9 rounded-full" onError={(e) => e.currentTarget.style.backgroundColor = token.color} />
                                                 <div className="text-left">
                                                     <div className="font-bold">{token.name}</div>
                                                     <div className="text-[10px] text-secondary-foreground font-bold uppercase tracking-wider flex items-center gap-2">
@@ -538,7 +535,7 @@ export default function SwapPage() {
                                         </motion.button>
                                     );
                                 })}
-                                
+
                                 {filteredTokens.length === 0 && (
                                     <div className="text-center py-8 text-secondary-foreground">
                                         No tokens found for "{searchQuery}"

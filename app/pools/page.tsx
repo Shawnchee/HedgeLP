@@ -6,7 +6,7 @@ import { Plus, Search, Info, ChevronRight, Star, ArrowUpRight, RefreshCw, Loader
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { useAccount } from "wagmi";
-import { useTopPools, useRewardPools, usePoolStats, formatTvl, formatApy } from "@/hooks/use-pool-data";
+import { useTopPools, useRewardPools, usePoolStats, formatTvl, formatApy, getTokenIconFromSymbol } from "@/hooks/use-pool-data";
 
 type SortOption = "apy-desc" | "apy-asc" | "tvl-desc" | "tvl-asc";
 
@@ -22,7 +22,7 @@ export default function PoolsPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState<SortOption>("apy-desc");
     const [showSortMenu, setShowSortMenu] = useState(false);
-    
+
     const { data: topPools, isLoading: poolsLoading, refetch, isFetching } = useTopPools(10);
     const { data: rewardPools, isLoading: rewardsLoading } = useRewardPools(5);
     const { data: poolStats, isLoading: statsLoading } = usePoolStats();
@@ -30,19 +30,19 @@ export default function PoolsPage() {
     // Filter and sort pools
     const filteredPools = useMemo(() => {
         if (!topPools) return [];
-        
+
         let pools = [...topPools];
-        
+
         // Filter by search
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
-            pools = pools.filter(pool => 
+            pools = pools.filter(pool =>
                 pool.name.toLowerCase().includes(query) ||
                 pool.symbol.toLowerCase().includes(query) ||
                 pool.chain.toLowerCase().includes(query)
             );
         }
-        
+
         // Sort pools
         pools.sort((a, b) => {
             switch (sortBy) {
@@ -58,7 +58,7 @@ export default function PoolsPage() {
                     return 0;
             }
         });
-        
+
         return pools;
     }, [topPools, searchQuery, sortBy]);
 
@@ -172,9 +172,9 @@ export default function PoolsPage() {
                                     </button>
                                     {showSortMenu && (
                                         <>
-                                            <div 
-                                                className="fixed inset-0 z-10" 
-                                                onClick={() => setShowSortMenu(false)} 
+                                            <div
+                                                className="fixed inset-0 z-10"
+                                                onClick={() => setShowSortMenu(false)}
                                             />
                                             <div className="absolute right-0 top-full mt-1 w-40 bg-card border rounded-xl shadow-lg z-20 overflow-hidden">
                                                 {SORT_OPTIONS.map((option) => (
@@ -184,9 +184,8 @@ export default function PoolsPage() {
                                                             setSortBy(option.value);
                                                             setShowSortMenu(false);
                                                         }}
-                                                        className={`w-full px-4 py-2 text-left text-sm hover:bg-secondary/50 transition-colors ${
-                                                            sortBy === option.value ? 'bg-primary/10 text-primary font-bold' : ''
-                                                        }`}
+                                                        className={`w-full px-4 py-2 text-left text-sm hover:bg-secondary/50 transition-colors ${sortBy === option.value ? 'bg-primary/10 text-primary font-bold' : ''
+                                                            }`}
                                                     >
                                                         {option.label}
                                                     </button>
@@ -239,7 +238,7 @@ export default function PoolsPage() {
                             ) : (
                                 <div className="divide-y">
                                     {filteredPools.map((pool, i) => (
-                                        <motion.div 
+                                        <motion.div
                                             key={pool.id}
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
@@ -248,14 +247,39 @@ export default function PoolsPage() {
                                         >
                                             <div className="flex items-center gap-4">
                                                 <div className="flex -space-x-3">
-                                                    <div 
-                                                        className="w-10 h-10 rounded-full border-4 border-card z-10" 
-                                                        style={{ backgroundColor: pool.color1 }} 
-                                                    />
-                                                    <div 
-                                                        className="w-10 h-10 rounded-full border-4 border-card" 
-                                                        style={{ backgroundColor: pool.color2 }} 
-                                                    />
+                                                    {(() => {
+                                                        const icons = getTokenIconFromSymbol(pool.symbol);
+                                                        return (
+                                                            <>
+                                                                <img
+                                                                    src={icons.token1Icon}
+                                                                    alt="Token 1"
+                                                                    className="w-10 h-10 rounded-full border-4 border-card z-10"
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                                                    }}
+                                                                />
+                                                                <div
+                                                                    className="w-10 h-10 rounded-full border-4 border-card z-10 hidden"
+                                                                    style={{ backgroundColor: pool.color1 }}
+                                                                />
+                                                                <img
+                                                                    src={icons.token2Icon}
+                                                                    alt="Token 2"
+                                                                    className="w-10 h-10 rounded-full border-4 border-card"
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                                                    }}
+                                                                />
+                                                                <div
+                                                                    className="w-10 h-10 rounded-full border-4 border-card hidden"
+                                                                    style={{ backgroundColor: pool.color2 }}
+                                                                />
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div>
                                                     <div className="font-bold group-hover:text-primary transition-colors">
@@ -323,7 +347,7 @@ export default function PoolsPage() {
                                 ))
                             ) : rewardPools && rewardPools.length > 0 ? (
                                 rewardPools.map((pool) => (
-                                    <motion.div 
+                                    <motion.div
                                         key={pool.id}
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
@@ -332,14 +356,39 @@ export default function PoolsPage() {
                                         <div className="flex items-center justify-between mb-3">
                                             <div className="flex items-center gap-3">
                                                 <div className="flex -space-x-2">
-                                                    <div 
-                                                        className="w-8 h-8 rounded-full border-2 border-card" 
-                                                        style={{ backgroundColor: pool.color1 }} 
-                                                    />
-                                                    <div 
-                                                        className="w-8 h-8 rounded-full border-2 border-card" 
-                                                        style={{ backgroundColor: pool.color2 }} 
-                                                    />
+                                                    {(() => {
+                                                        const icons = getTokenIconFromSymbol(pool.symbol);
+                                                        return (
+                                                            <>
+                                                                <img
+                                                                    src={icons.token1Icon}
+                                                                    alt="Token 1"
+                                                                    className="w-8 h-8 rounded-full border-2 border-card"
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                                                    }}
+                                                                />
+                                                                <div
+                                                                    className="w-8 h-8 rounded-full border-2 border-card hidden"
+                                                                    style={{ backgroundColor: pool.color1 }}
+                                                                />
+                                                                <img
+                                                                    src={icons.token2Icon}
+                                                                    alt="Token 2"
+                                                                    className="w-8 h-8 rounded-full border-2 border-card"
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = 'none';
+                                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                                                    }}
+                                                                />
+                                                                <div
+                                                                    className="w-8 h-8 rounded-full border-2 border-card hidden"
+                                                                    style={{ backgroundColor: pool.color2 }}
+                                                                />
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div className="font-bold text-sm">{pool.name}</div>
                                             </div>
@@ -397,7 +446,7 @@ export default function PoolsPage() {
                                 <div className="text-sm font-bold text-primary">Delta Neutral</div>
                             </div>
                         </div>
-                        <button 
+                        <button
                             onClick={() => window.location.href = '/dashboard'}
                             className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:opacity-90 transition-all"
                         >

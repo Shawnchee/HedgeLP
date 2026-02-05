@@ -28,13 +28,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useAccount } from "wagmi";
-import { 
-    useTokenPrice, 
-    useTokenChart, 
-    useExchangeRate, 
+import {
+    useTokenPrice,
+    useTokenChart,
+    useExchangeRate,
     formatCurrency,
     SUPPORTED_TOKENS,
-    type TimeFrame 
+    type TimeFrame
 } from "@/hooks/use-market-data";
 
 const TIMEFRAMES: { label: string; value: TimeFrame }[] = [
@@ -47,10 +47,10 @@ const TIMEFRAMES: { label: string; value: TimeFrame }[] = [
 ];
 
 const SWAP_TOKENS = [
-    { id: "ethereum", symbol: "ETH", name: "Ethereum", color: "#627EEA" },
-    { id: "usd-coin", symbol: "USDC", name: "USD Coin", color: "#2775CA" },
-    { id: "tether", symbol: "USDT", name: "Tether", color: "#26A17B" },
-    { id: "dai", symbol: "DAI", name: "Dai", color: "#F5AC37" },
+    { id: "ethereum", symbol: "ETH", name: "Ethereum", color: "#627EEA", image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/eth.svg" },
+    { id: "usd-coin", symbol: "USDC", name: "USD Coin", color: "#2775CA", image: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png" },
+    { id: "tether", symbol: "USDT", name: "Tether", color: "#26A17B", image: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png" },
+    { id: "dai", symbol: "DAI", name: "Dai", color: "#F5AC37", image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/dai.svg" },
 ];
 
 export default function TokenDetailPage() {
@@ -90,7 +90,8 @@ export default function TokenDetailPage() {
         symbol: "TOKEN",
         name: "Token",
         color: "#627EEA",
-        decimals: 18
+        decimals: 18,
+        image: "https://via.placeholder.com/48/627EEA/ffffff?text=TOKEN"
     };
 
     // Price change color
@@ -109,9 +110,18 @@ export default function TokenDetailPage() {
                     {/* Token Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                            <div 
-                                className="w-12 h-12 rounded-full" 
-                                style={{ backgroundColor: token?.color || tokenConfig.color }} 
+                            <img
+                                src={token?.image || tokenConfig.image || `https://via.placeholder.com/48/${tokenConfig.color.slice(1)}/ffffff?text=${tokenConfig.symbol}`}
+                                alt={token?.symbol || tokenConfig.symbol}
+                                className="w-12 h-12 rounded-full"
+                                onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                }}
+                            />
+                            <div
+                                className="w-12 h-12 rounded-full hidden"
+                                style={{ backgroundColor: token?.color || tokenConfig.color }}
                             />
                             <div>
                                 <div className="flex items-center gap-2">
@@ -152,18 +162,17 @@ export default function TokenDetailPage() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         {/* Timeframe Selector */}
                         <div className="flex gap-1 bg-secondary/30 p-1 rounded-xl">
                             {TIMEFRAMES.map((tf) => (
-                                <button 
+                                <button
                                     key={tf.value}
                                     onClick={() => setTimeframe(tf.value)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                        timeframe === tf.value 
-                                            ? "bg-card text-foreground shadow-sm" 
-                                            : "text-secondary-foreground hover:text-foreground"
-                                    }`}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${timeframe === tf.value
+                                        ? "bg-card text-foreground shadow-sm"
+                                        : "text-secondary-foreground hover:text-foreground"
+                                        }`}
                                 >
                                     {tf.label}
                                 </button>
@@ -172,7 +181,7 @@ export default function TokenDetailPage() {
                     </div>
 
                     {/* Large Price Chart */}
-                    <motion.div 
+                    <motion.div
                         key={timeframe}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -191,16 +200,16 @@ export default function TokenDetailPage() {
                                             <stop offset="95%" stopColor={isPositive ? "#27D545" : "#FD3B4C"} stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <XAxis 
-                                        dataKey="time" 
+                                    <XAxis
+                                        dataKey="time"
                                         axisLine={false}
                                         tickLine={false}
                                         tick={{ fontSize: 10, fill: '#98A1C0' }}
                                         interval="preserveStartEnd"
                                     />
-                                    <YAxis 
-                                        hide 
-                                        domain={['dataMin * 0.99', 'dataMax * 1.01']} 
+                                    <YAxis
+                                        hide
+                                        domain={['dataMin * 0.99', 'dataMax * 1.01']}
                                     />
                                     <Tooltip
                                         content={({ active, payload }) => {
@@ -244,7 +253,7 @@ export default function TokenDetailPage() {
                             { label: "Circulating Supply", value: token ? `${(token.circulating_supply / 1e6).toFixed(1)}M` : "—" },
                             { label: "7D Change", value: token ? `${token.price_change_percentage_7d?.toFixed(2) || 0}%` : "—" },
                         ].map((stat, i) => (
-                            <motion.div 
+                            <motion.div
                                 key={i}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -263,11 +272,11 @@ export default function TokenDetailPage() {
                     <section className="space-y-4">
                         <h2 className="text-xl font-bold">About {token?.name || tokenConfig.name}</h2>
                         <p className="text-secondary-foreground leading-relaxed text-sm">
-                            {token?.name || tokenConfig.name} ({token?.symbol?.toUpperCase() || tokenConfig.symbol}) is a cryptocurrency 
+                            {token?.name || tokenConfig.name} ({token?.symbol?.toUpperCase() || tokenConfig.symbol}) is a cryptocurrency
                             traded on decentralized exchanges. View real-time price charts, market data, and trading information.
                         </p>
                         <div className="flex gap-4">
-                            <a 
+                            <a
                                 href={`https://www.coingecko.com/en/coins/${id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
@@ -296,7 +305,7 @@ export default function TokenDetailPage() {
                             <div className="p-4 rounded-2xl bg-secondary/20 border-none group transition-all">
                                 <div className="flex justify-between mb-2">
                                     <span className="text-xs font-bold text-secondary-foreground">Sell</span>
-                                    <button 
+                                    <button
                                         onClick={() => setSellAmount("1")}
                                         className="text-xs font-bold text-primary hover:underline"
                                     >
@@ -311,11 +320,11 @@ export default function TokenDetailPage() {
                                         onChange={(e) => setSellAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                                         className="bg-transparent border-none outline-none text-2xl font-mono p-0 w-full"
                                     />
-                                    <button 
+                                    <button
                                         onClick={() => setShowTokenSelector("sell")}
                                         className="flex items-center gap-2 bg-secondary/50 px-2 py-1.5 rounded-xl text-xs font-bold hover:bg-secondary transition-colors"
                                     >
-                                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: sellToken.color }} />
+                                        <img src={sellToken.image} alt={sellToken.symbol} className="w-4 h-4 rounded-full" onError={(e) => e.currentTarget.style.backgroundColor = sellToken.color} />
                                         {sellToken.symbol}
                                         <ChevronDown className="w-3 h-3" />
                                     </button>
@@ -346,15 +355,14 @@ export default function TokenDetailPage() {
                                     <div className="text-2xl font-mono">
                                         {buyToken ? (buyAmount || "0") : "0"}
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={() => setShowTokenSelector("buy")}
-                                        className={`flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs font-bold transition-colors ${
-                                            buyToken ? 'bg-secondary/50 hover:bg-secondary' : 'bg-primary text-primary-foreground'
-                                        }`}
+                                        className={`flex items-center gap-2 px-2 py-1.5 rounded-xl text-xs font-bold transition-colors ${buyToken ? 'bg-secondary/50 hover:bg-secondary' : 'bg-primary text-primary-foreground'
+                                            }`}
                                     >
                                         {buyToken ? (
                                             <>
-                                                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: buyToken.color }} />
+                                                <img src={buyToken.image} alt={buyToken.symbol} className="w-4 h-4 rounded-full" onError={(e) => e.currentTarget.style.backgroundColor = buyToken.color} />
                                                 {buyToken.symbol}
                                             </>
                                         ) : (
@@ -383,14 +391,14 @@ export default function TokenDetailPage() {
                                 <WalletButton />
                             </div>
                         ) : !buyToken ? (
-                            <button 
+                            <button
                                 disabled
                                 className="w-full mt-4 py-3 rounded-2xl bg-secondary/50 text-secondary-foreground font-bold cursor-not-allowed"
                             >
                                 Select a token
                             </button>
                         ) : !sellAmount || parseFloat(sellAmount) <= 0 ? (
-                            <button 
+                            <button
                                 disabled
                                 className="w-full mt-4 py-3 rounded-2xl bg-secondary/50 text-secondary-foreground font-bold cursor-not-allowed"
                             >
@@ -423,7 +431,7 @@ export default function TokenDetailPage() {
                         <p className="text-xs text-secondary-foreground leading-relaxed mb-4">
                             Earn yield on this asset while protecting against price volatility. Our strategy maintains a delta-neutral position for high-APY liquidity provision.
                         </p>
-                        <button 
+                        <button
                             onClick={() => window.location.href = '/dashboard'}
                             className="w-full py-2 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:opacity-90 transition-all"
                         >
@@ -454,14 +462,14 @@ export default function TokenDetailPage() {
                                 <h3 className="text-lg font-bold">
                                     Select token to {showTokenSelector}
                                 </h3>
-                                <button 
+                                <button
                                     onClick={() => setShowTokenSelector(null)}
                                     className="text-secondary-foreground hover:text-foreground"
                                 >
                                     ✕
                                 </button>
                             </div>
-                            
+
                             <div className="space-y-2">
                                 {SWAP_TOKENS.map((t) => (
                                     <button
@@ -476,7 +484,7 @@ export default function TokenDetailPage() {
                                         }}
                                         className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary/30 transition-colors"
                                     >
-                                        <div className="w-8 h-8 rounded-full" style={{ backgroundColor: t.color }} />
+                                        <img src={t.image} alt={t.symbol} className="w-8 h-8 rounded-full" onError={(e) => e.currentTarget.style.backgroundColor = t.color} />
                                         <div className="text-left">
                                             <div className="font-bold">{t.name}</div>
                                             <div className="text-xs text-secondary-foreground">{t.symbol}</div>

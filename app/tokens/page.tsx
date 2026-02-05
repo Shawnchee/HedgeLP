@@ -12,7 +12,7 @@ function MiniChart({ data, color }: { data: number[] | undefined, color: string 
         // Fallback placeholder
         return <div className="h-10 w-24 bg-secondary/20 rounded animate-pulse" />;
     }
-    
+
     const chartData = data.map((v, i) => ({ value: v, time: i }));
     return (
         <div className="h-10 w-24">
@@ -45,9 +45,9 @@ export default function TokensPage() {
     const filteredTokens = useMemo(() => {
         if (!tokens) return [];
         if (!searchQuery) return tokens;
-        
+
         const query = searchQuery.toLowerCase();
-        return tokens.filter(token => 
+        return tokens.filter(token =>
             token.name.toLowerCase().includes(query) ||
             token.symbol.toLowerCase().includes(query)
         );
@@ -63,27 +63,27 @@ export default function TokensPage() {
                 { label: "Active Markets", value: "12,500+", change: null },
             ];
         }
-        
+
         return [
-            { 
-                label: "Total Market Cap", 
-                value: formatCurrency(marketStats.totalMarketCap, true), 
+            {
+                label: "Total Market Cap",
+                value: formatCurrency(marketStats.totalMarketCap, true),
                 change: formatPercent(marketStats.marketCapChange24h)
             },
-            { 
-                label: "24H Volume", 
-                value: formatCurrency(marketStats.totalVolume24h, true), 
-                change: "+21.58%" 
+            {
+                label: "24H Volume",
+                value: formatCurrency(marketStats.totalVolume24h, true),
+                change: "+21.58%"
             },
-            { 
-                label: "ETH Dominance", 
-                value: `${marketStats.ethDominance.toFixed(1)}%`, 
-                change: "+0.5%" 
+            {
+                label: "ETH Dominance",
+                value: `${marketStats.ethDominance.toFixed(1)}%`,
+                change: "+0.5%"
             },
-            { 
-                label: "BTC Dominance", 
-                value: `${marketStats.btcDominance.toFixed(1)}%`, 
-                change: null 
+            {
+                label: "BTC Dominance",
+                value: `${marketStats.btcDominance.toFixed(1)}%`,
+                change: null
             },
         ];
     }, [marketStats]);
@@ -127,7 +127,7 @@ export default function TokensPage() {
                 {/* Market Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                     {stats.map((stat, i) => (
-                        <motion.div 
+                        <motion.div
                             key={i}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -216,9 +216,18 @@ export default function TokensPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div 
-                                                        className="w-8 h-8 rounded-full flex-shrink-0" 
-                                                        style={{ backgroundColor: token.color }} 
+                                                    <img
+                                                        src={token.image}
+                                                        alt={token.symbol}
+                                                        className="w-8 h-8 rounded-full flex-shrink-0"
+                                                        onError={(e) => {
+                                                            e.currentTarget.style.display = 'none';
+                                                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                                        }}
+                                                    />
+                                                    <div
+                                                        className="w-8 h-8 rounded-full flex-shrink-0 hidden"
+                                                        style={{ backgroundColor: token.color }}
                                                     />
                                                     <div>
                                                         <div className="font-bold text-sm group-hover:text-primary transition-colors">
@@ -231,9 +240,9 @@ export default function TokensPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right font-mono text-sm font-bold">
-                                                ${(token.current_price ?? 0).toLocaleString(undefined, { 
+                                                ${(token.current_price ?? 0).toLocaleString(undefined, {
                                                     minimumFractionDigits: (token.current_price ?? 0) < 1 ? 4 : 2,
-                                                    maximumFractionDigits: (token.current_price ?? 0) < 1 ? 6 : 2 
+                                                    maximumFractionDigits: (token.current_price ?? 0) < 1 ? 6 : 2
                                                 })}
                                             </td>
                                             <td className="px-6 py-4 text-right">
@@ -257,9 +266,9 @@ export default function TokensPage() {
                                             </td>
                                             <td className="px-6 py-4 text-right pr-6">
                                                 <div className="flex justify-end">
-                                                    <MiniChart 
-                                                        data={token.sparkline_in_7d?.price?.slice(-24)} 
-                                                        color={(token.price_change_percentage_24h ?? 0) > 0 ? "#27D545" : "#FD3B4C"} 
+                                                    <MiniChart
+                                                        data={token.sparkline_in_7d?.price?.slice(-24)}
+                                                        color={(token.price_change_percentage_24h ?? 0) > 0 ? "#27D545" : "#FD3B4C"}
                                                     />
                                                 </div>
                                             </td>

@@ -5,21 +5,32 @@ import { useQuery } from "@tanstack/react-query";
 // ============ Token Configuration ============
 
 export const SUPPORTED_TOKENS = {
-    ethereum: { id: "ethereum", symbol: "ETH", name: "Ethereum", color: "#627EEA", decimals: 18 },
-    usdc: { id: "usd-coin", symbol: "USDC", name: "USD Coin", color: "#2775CA", decimals: 6 },
-    usdt: { id: "tether", symbol: "USDT", name: "Tether", color: "#26A17B", decimals: 6 },
-    dai: { id: "dai", symbol: "DAI", name: "Dai", color: "#F5AC37", decimals: 18 },
-    wbtc: { id: "wrapped-bitcoin", symbol: "WBTC", name: "Wrapped Bitcoin", color: "#F7931A", decimals: 8 },
-    uni: { id: "uniswap", symbol: "UNI", name: "Uniswap", color: "#FF007A", decimals: 18 },
-    link: { id: "chainlink", symbol: "LINK", name: "Chainlink", color: "#375BD2", decimals: 18 },
-    arb: { id: "arbitrum", symbol: "ARB", name: "Arbitrum", color: "#28A0F0", decimals: 18 },
-    op: { id: "optimism", symbol: "OP", name: "Optimism", color: "#FF0420", decimals: 18 },
-    aave: { id: "aave", symbol: "AAVE", name: "Aave", color: "#B6509E", decimals: 18 },
-    sol: { id: "solana", symbol: "SOL", name: "Solana", color: "#14F195", decimals: 9 },
-    matic: { id: "matic-network", symbol: "MATIC", name: "Polygon", color: "#8247E5", decimals: 18 },
+    ethereum: { id: "ethereum", symbol: "ETH", name: "Ethereum", color: "#627EEA", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/eth.svg" },
+    usdc: { id: "usd-coin", symbol: "USDC", name: "USD Coin", color: "#2775CA", decimals: 6, image: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png" },
+    usdt: { id: "tether", symbol: "USDT", name: "Tether", color: "#26A17B", decimals: 6, image: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png" },
+    dai: { id: "dai", symbol: "DAI", name: "Dai", color: "#F5AC37", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/dai.svg" },
+    wbtc: { id: "wrapped-bitcoin", symbol: "WBTC", name: "Wrapped Bitcoin", color: "#F7931A", decimals: 8, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/btc.svg" },
+    uni: { id: "uniswap", symbol: "UNI", name: "Uniswap", color: "#FF007A", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/uni.svg" },
+    link: { id: "chainlink", symbol: "LINK", name: "Chainlink", color: "#375BD2", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/link.svg" },
+    arb: { id: "arbitrum", symbol: "ARB", name: "Arbitrum", color: "#28A0F0", decimals: 18, image: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/arbitrum.svg" },
+    op: { id: "optimism", symbol: "OP", name: "Optimism", color: "#FF0420", decimals: 18, image: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/optimism.svg" },
+    aave: { id: "aave", symbol: "AAVE", name: "Aave", color: "#B6509E", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/aave.svg" },
+    sol: { id: "solana", symbol: "SOL", name: "Solana", color: "#14F195", decimals: 9, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/sol.svg" },
+    matic: { id: "matic-network", symbol: "MATIC", name: "Polygon", color: "#8247E5", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/matic.svg" },
 } as const;
 
 export type TokenId = keyof typeof SUPPORTED_TOKENS;
+
+// Helper function to get token icon by symbol (case-insensitive)
+export function getTokenIcon(symbol: string): string {
+    const normalizedSymbol = symbol.toUpperCase();
+    const token = Object.values(SUPPORTED_TOKENS).find(t => t.symbol === normalizedSymbol);
+    if (token) {
+        return token.image;
+    }
+    // Fallback placeholder with default color
+    return `https://via.placeholder.com/40/627EEA/ffffff?text=${normalizedSymbol}`;
+}
 
 // ============ Types ============
 
@@ -35,6 +46,7 @@ export interface TokenPrice {
     circulating_supply: number;
     sparkline_in_7d?: { price: number[] };
     color: string;
+    image: string;
 }
 
 export interface ChartDataPoint {
@@ -73,17 +85,17 @@ export function useTokenPrices() {
         queryFn: async () => {
             try {
                 const response = await fetch(`${API_BASE}/prices?ids=${tokenIds}`);
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     throw new Error(data.error);
                 }
-                
+
                 // Add color from our config
                 return data.map((token: any) => {
                     const config = Object.values(SUPPORTED_TOKENS).find(t => t.id === token.id);
@@ -114,14 +126,14 @@ export function useTokenPrice(tokenId: string) {
         queryFn: async () => {
             try {
                 const response = await fetch(`${API_BASE}/prices?ids=${coingeckoId}`);
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
                 if (data.error || data.length === 0) return null;
-                
+
                 const config = Object.values(SUPPORTED_TOKENS).find(t => t.id === coingeckoId);
                 return {
                     ...data[0],
@@ -148,17 +160,17 @@ export function useTokenChart(tokenId: string, timeframe: TimeFrame = "7d") {
         queryFn: async () => {
             try {
                 const response = await fetch(`${API_BASE}/chart?id=${coingeckoId}&days=${days}`);
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     throw new Error(data.error);
                 }
-                
+
                 // Transform to chart format
                 return data.prices.map(([timestamp, value]: [number, number]) => ({
                     timestamp,
@@ -186,20 +198,20 @@ export function useExchangeRate(fromToken: string, toToken: string) {
         queryFn: async () => {
             try {
                 const response = await fetch(`${API_BASE}/rate?ids=${fromId},${toId}`);
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     throw new Error(data.error);
                 }
-                
+
                 const fromPrice = data[fromId]?.usd || 0;
                 const toPrice = data[toId]?.usd || 1;
-                
+
                 return {
                     rate: toPrice > 0 ? fromPrice / toPrice : 0,
                     fromPrice,
@@ -225,17 +237,17 @@ export function useMarketStats() {
         queryFn: async () => {
             try {
                 const response = await fetch(`${API_BASE}/stats`);
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     throw new Error(data.error);
                 }
-                
+
                 return {
                     totalMarketCap: data.data.total_market_cap.usd,
                     totalVolume24h: data.data.total_volume.usd,
@@ -263,7 +275,7 @@ export function useMarketStats() {
 
 function formatChartTime(timestamp: number, timeframe: TimeFrame): string {
     const date = new Date(timestamp);
-    
+
     switch (timeframe) {
         case "1h":
         case "24h":
@@ -285,12 +297,12 @@ function formatChartTime(timestamp: number, timeframe: TimeFrame): string {
 
 function getFallbackTokenPrices(): TokenPrice[] {
     return [
-        { id: "ethereum", symbol: "eth", name: "Ethereum", current_price: 2314.87, price_change_percentage_24h: 0.22, price_change_percentage_7d: 2.5, market_cap: 282700000000, total_volume: 353900000, circulating_supply: 122000000, color: "#627EEA" },
-        { id: "usd-coin", symbol: "usdc", name: "USD Coin", current_price: 1.00, price_change_percentage_24h: 0.01, price_change_percentage_7d: 0.02, market_cap: 70600000000, total_volume: 238300000, circulating_supply: 70600000000, color: "#2775CA" },
-        { id: "wrapped-bitcoin", symbol: "wbtc", name: "Wrapped Bitcoin", current_price: 78032.59, price_change_percentage_24h: 0.20, price_change_percentage_7d: 3.1, market_cap: 9500000000, total_volume: 138100000, circulating_supply: 121000, color: "#F7931A" },
-        { id: "uniswap", symbol: "uni", name: "Uniswap", current_price: 8.95, price_change_percentage_24h: -1.24, price_change_percentage_7d: -2.3, market_cap: 5400000000, total_volume: 45000000, circulating_supply: 600000000, color: "#FF007A" },
-        { id: "chainlink", symbol: "link", name: "Chainlink", current_price: 14.82, price_change_percentage_24h: 1.5, price_change_percentage_7d: 4.2, market_cap: 8700000000, total_volume: 320000000, circulating_supply: 587000000, color: "#375BD2" },
-        { id: "arbitrum", symbol: "arb", name: "Arbitrum", current_price: 1.15, price_change_percentage_24h: 2.1, price_change_percentage_7d: -1.5, market_cap: 2900000000, total_volume: 180000000, circulating_supply: 2500000000, color: "#28A0F0" },
+        { id: "ethereum", symbol: "eth", name: "Ethereum", current_price: 2314.87, price_change_percentage_24h: 0.22, price_change_percentage_7d: 2.5, market_cap: 282700000000, total_volume: 353900000, circulating_supply: 122000000, color: "#627EEA", image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/eth.svg" },
+        { id: "usd-coin", symbol: "usdc", name: "USD Coin", current_price: 1.00, price_change_percentage_24h: 0.01, price_change_percentage_7d: 0.02, market_cap: 70600000000, total_volume: 238300000, circulating_supply: 70600000000, color: "#2775CA", image: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png" },
+        { id: "wrapped-bitcoin", symbol: "wbtc", name: "Wrapped Bitcoin", current_price: 78032.59, price_change_percentage_24h: 0.20, price_change_percentage_7d: 3.1, market_cap: 9500000000, total_volume: 138100000, circulating_supply: 121000, color: "#F7931A", image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/btc.svg" },
+        { id: "uniswap", symbol: "uni", name: "Uniswap", current_price: 8.95, price_change_percentage_24h: -1.24, price_change_percentage_7d: -2.3, market_cap: 5400000000, total_volume: 45000000, circulating_supply: 600000000, color: "#FF007A", image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/uni.svg" },
+        { id: "chainlink", symbol: "link", name: "Chainlink", current_price: 14.82, price_change_percentage_24h: 1.5, price_change_percentage_7d: 4.2, market_cap: 8700000000, total_volume: 320000000, circulating_supply: 587000000, color: "#375BD2", image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/link.svg" },
+        { id: "arbitrum", symbol: "arb", name: "Arbitrum", current_price: 1.15, price_change_percentage_24h: 2.1, price_change_percentage_7d: -1.5, market_cap: 2900000000, total_volume: 180000000, circulating_supply: 2500000000, color: "#28A0F0", image: "https://raw.githubusercontent.com/lifinance/types/main/src/assets/icons/chains/arbitrum.svg" },
     ];
 }
 
@@ -298,7 +310,7 @@ function getFallbackChartData(timeframe: TimeFrame): ChartDataPoint[] {
     const now = Date.now();
     const points = timeframe === "1h" ? 12 : timeframe === "24h" ? 24 : timeframe === "7d" ? 7 : 30;
     const interval = timeframe === "1h" ? 5 * 60 * 1000 : timeframe === "24h" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-    
+
     let basePrice = 2300;
     return Array.from({ length: points }, (_, i) => {
         const timestamp = now - (points - i - 1) * interval;

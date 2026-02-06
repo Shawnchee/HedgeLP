@@ -25,7 +25,7 @@ import { fmtUsd, fmtNum, fmtCompact, italic, divider } from "./utils/formatters"
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
-import { handleStart, handleHelp } from "./handlers/help";
+import { handleStart, handleHelp, handleClear } from "./handlers/help";
 import { handlePrice } from "./handlers/price";
 import { handlePools, handleApy } from "./handlers/pools";
 import { handleNews } from "./handlers/news";
@@ -80,6 +80,10 @@ const COMMANDS: Record<string, CommandDef> = {
   stats: {
     description: "Global market overview",
     handler: (bot, msg) => handleStats(bot, msg),
+  },
+  clear: {
+    description: "Clear bot messages from chat",
+    handler: (bot, msg, args) => handleClear(bot, msg, args),
   },
 };
 

@@ -10,6 +10,7 @@ const SUPPORTED_CHAINS = [
     { id: 8453, name: "Base", color: "#0052FF" },
     { id: 1, name: "Ethereum", color: "#627EEA" },
     { id: 11155111, name: "Sepolia", color: "#CFB5F0" },
+    { id: 31337, name: "Local", color: "#F5F5F5" },
 ];
 
 export function WalletButton() {

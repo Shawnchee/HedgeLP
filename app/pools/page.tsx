@@ -1,12 +1,19 @@
 "use client";
 
 import { Header } from "@/components/header";
-import { WalletButton } from "@/components/wallet-button";
-import { Plus, Search, Info, ChevronRight, Star, ArrowUpRight, RefreshCw, Loader2, TrendingUp, Shield, ArrowDownUp, ChevronDown } from "lucide-react";
-import { motion } from "framer-motion";
-import { useState, useMemo } from "react";
-import { useAccount } from "wagmi";
-import { useTopPools, useRewardPools, usePoolStats, formatTvl, formatApy, getTokenIconFromSymbol } from "@/hooks/use-pool-data";
+import { PoolDepositModal, type PoolDepositSettings } from "@/components/pool-deposit-modal";
+import {
+    Search, Star, ArrowUpRight, RefreshCw, Loader2,
+    TrendingUp, ArrowDownUp, ChevronDown, ChevronRight,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState, useMemo, useCallback } from "react";
+import {
+    useTopPools, useRewardPools, usePoolStats,
+    formatTvl, formatApy, getTokenIconFromSymbol,
+    type Pool,
+} from "@/hooks/use-pool-data";
+import { usePositions, type VaultPosition } from "@/hooks/use-positions";
 
 type SortOption = "apy-desc" | "apy-asc" | "tvl-desc" | "tvl-asc";
 
@@ -18,22 +25,53 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 ];
 
 export default function PoolsPage() {
-    const { isConnected } = useAccount();
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState<SortOption>("apy-desc");
     const [showSortMenu, setShowSortMenu] = useState(false);
+    const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+    const [showDepositModal, setShowDepositModal] = useState(false);
 
-    const { data: topPools, isLoading: poolsLoading, refetch, isFetching } = useTopPools(10);
+    const { data: topPools, isLoading: poolsLoading, refetch, isFetching } = useTopPools(50);
     const { data: rewardPools, isLoading: rewardsLoading } = useRewardPools(5);
     const { data: poolStats, isLoading: statsLoading } = usePoolStats();
+    const { addPosition } = usePositions();
+
+    const handlePoolClick = useCallback((pool: Pool) => {
+        setSelectedPool(pool);
+        setShowDepositModal(true);
+    }, []);
+
+    const handleDepositSuccess = useCallback((pool: Pool, amount: number, settings: PoolDepositSettings) => {
+        const icons = getTokenIconFromSymbol(pool.symbol);
+        const newPos: VaultPosition = {
+            id: `pos-${Date.now()}`,
+            pool: pool.name,
+            protocol: pool.version || "Uniswap V3",
+            chain: pool.chain,
+            deposited: amount,
+            currentValue: amount,
+            pnl: 0,
+            pnlPercent: 0,
+            lpPercent: settings.lpPercent,
+            hedgePercent: 100 - settings.lpPercent,
+            apy: pool.apy || 0,
+            autoCompound: settings.autoCompound,
+            autoStopLoss: settings.autoStopLoss,
+            openedAt: "Just now",
+            timestamp: Date.now(),
+            icon1: icons.token1Icon,
+            icon2: icons.token2Icon,
+            color1: pool.color1,
+            color2: pool.color2,
+        };
+        addPosition(newPos);
+    }, [addPosition]);
 
     // Filter and sort pools
     const filteredPools = useMemo(() => {
         if (!topPools) return [];
-
         let pools = [...topPools];
 
-        // Filter by search
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
             pools = pools.filter(pool =>
@@ -43,19 +81,13 @@ export default function PoolsPage() {
             );
         }
 
-        // Sort pools
         pools.sort((a, b) => {
             switch (sortBy) {
-                case "apy-desc":
-                    return (b.apy ?? 0) - (a.apy ?? 0);
-                case "apy-asc":
-                    return (a.apy ?? 0) - (b.apy ?? 0);
-                case "tvl-desc":
-                    return (b.tvlUsd ?? 0) - (a.tvlUsd ?? 0);
-                case "tvl-asc":
-                    return (a.tvlUsd ?? 0) - (b.tvlUsd ?? 0);
-                default:
-                    return 0;
+                case "apy-desc": return (b.apy ?? 0) - (a.apy ?? 0);
+                case "apy-asc": return (a.apy ?? 0) - (b.apy ?? 0);
+                case "tvl-desc": return (b.tvlUsd ?? 0) - (a.tvlUsd ?? 0);
+                case "tvl-asc": return (a.tvlUsd ?? 0) - (b.tvlUsd ?? 0);
+                default: return 0;
             }
         });
 
@@ -68,7 +100,7 @@ export default function PoolsPage() {
 
             <div className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-                {/* Left Column: Your Positions & Top Pools */}
+                {/* Left Column: Stats + Top Pools */}
                 <div className="lg:col-span-8 space-y-8">
 
                     {/* Pool Stats */}
@@ -86,60 +118,12 @@ export default function PoolsPage() {
                                 transition={{ delay: i * 0.05 }}
                                 className="p-4 rounded-2xl border bg-card/50"
                             >
-                                <div className="text-[10px] font-bold text-secondary-foreground uppercase tracking-widest mb-1">
-                                    {stat.label}
-                                </div>
+                                <div className="text-[10px] font-bold text-secondary-foreground uppercase tracking-widest mb-1">{stat.label}</div>
                                 <div className="text-lg font-mono font-bold">
-                                    {stat.loading ? (
-                                        <span className="animate-pulse bg-secondary/50 rounded w-16 h-6 inline-block" />
-                                    ) : (
-                                        stat.value
-                                    )}
+                                    {stat.loading ? <span className="animate-pulse bg-secondary/50 rounded w-16 h-6 inline-block" /> : stat.value}
                                 </div>
                             </motion.div>
                         ))}
-                    </section>
-
-                    {/* Your Positions */}
-                    <section>
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-2xl font-bold">Your positions</h2>
-                            <button className="flex items-center gap-2 px-6 py-2 rounded-full bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-all">
-                                <Plus className="w-4 h-4" />
-                                New position
-                            </button>
-                        </div>
-
-                        {!isConnected ? (
-                            <div className="p-12 rounded-2xl border border-dashed bg-card/30 flex flex-col items-center justify-center text-center">
-                                <div className="w-12 h-12 rounded-xl bg-secondary/50 flex items-center justify-center mb-4">
-                                    <Shield className="w-6 h-6 text-secondary-foreground" />
-                                </div>
-                                <h3 className="font-bold mb-2">Connect Your Wallet</h3>
-                                <p className="text-secondary-foreground text-sm max-w-sm mb-6">
-                                    Connect your wallet to view your liquidity positions and start earning fees.
-                                </p>
-                                <WalletButton />
-                            </div>
-                        ) : (
-                            <div className="p-12 rounded-2xl border border-dashed bg-card/30 flex flex-col items-center justify-center text-center">
-                                <div className="w-12 h-12 rounded-xl bg-secondary/50 flex items-center justify-center mb-4">
-                                    <Info className="w-6 h-6 text-secondary-foreground" />
-                                </div>
-                                <h3 className="font-bold mb-2">No positions yet</h3>
-                                <p className="text-secondary-foreground text-sm max-w-sm mb-6">
-                                    You don't have any liquidity positions. Create a new position to start earning fees and rewards on eligible pools.
-                                </p>
-                                <div className="flex gap-4">
-                                    <button className="px-6 py-2 rounded-xl bg-secondary/50 font-bold text-sm hover:bg-secondary transition-colors">
-                                        Explore pools
-                                    </button>
-                                    <button className="px-6 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition-all">
-                                        New position
-                                    </button>
-                                </div>
-                            </div>
-                        )}
                     </section>
 
                     {/* Top Pools */}
@@ -152,11 +136,7 @@ export default function PoolsPage() {
                                     disabled={isFetching}
                                     className="p-1.5 rounded-lg hover:bg-secondary/50 transition-colors disabled:opacity-50"
                                 >
-                                    {isFetching ? (
-                                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                                    ) : (
-                                        <RefreshCw className="w-4 h-4 text-secondary-foreground" />
-                                    )}
+                                    {isFetching ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <RefreshCw className="w-4 h-4 text-secondary-foreground" />}
                                 </button>
                             </div>
                             <div className="flex items-center gap-2">
@@ -168,24 +148,17 @@ export default function PoolsPage() {
                                     >
                                         <ArrowDownUp className="w-4 h-4" />
                                         <span className="hidden sm:inline">{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
-                                        <ChevronDown className={`w-3 h-3 transition-transform ${showSortMenu ? 'rotate-180' : ''}`} />
+                                        <ChevronDown className={`w-3 h-3 transition-transform ${showSortMenu ? "rotate-180" : ""}`} />
                                     </button>
                                     {showSortMenu && (
                                         <>
-                                            <div
-                                                className="fixed inset-0 z-10"
-                                                onClick={() => setShowSortMenu(false)}
-                                            />
+                                            <div className="fixed inset-0 z-10" onClick={() => setShowSortMenu(false)} />
                                             <div className="absolute right-0 top-full mt-1 w-40 bg-card border rounded-xl shadow-lg z-20 overflow-hidden">
                                                 {SORT_OPTIONS.map((option) => (
                                                     <button
                                                         key={option.value}
-                                                        onClick={() => {
-                                                            setSortBy(option.value);
-                                                            setShowSortMenu(false);
-                                                        }}
-                                                        className={`w-full px-4 py-2 text-left text-sm hover:bg-secondary/50 transition-colors ${sortBy === option.value ? 'bg-primary/10 text-primary font-bold' : ''
-                                                            }`}
+                                                        onClick={() => { setSortBy(option.value); setShowSortMenu(false); }}
+                                                        className={`w-full px-4 py-2 text-left text-sm hover:bg-secondary/50 transition-colors ${sortBy === option.value ? "bg-primary/10 text-primary font-bold" : ""}`}
                                                     >
                                                         {option.label}
                                                     </button>
@@ -210,7 +183,6 @@ export default function PoolsPage() {
 
                         <div className="rounded-2xl border bg-card overflow-hidden">
                             {poolsLoading ? (
-                                // Loading skeleton
                                 <div className="divide-y">
                                     {Array.from({ length: 5 }).map((_, i) => (
                                         <div key={i} className="p-4 flex items-center justify-between animate-pulse">
@@ -243,6 +215,7 @@ export default function PoolsPage() {
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: i * 0.03 }}
+                                            onClick={() => handlePoolClick(pool)}
                                             className="p-4 flex items-center justify-between hover:bg-secondary/10 transition-colors cursor-pointer group"
                                         >
                                             <div className="flex items-center gap-4">
@@ -251,60 +224,31 @@ export default function PoolsPage() {
                                                         const icons = getTokenIconFromSymbol(pool.symbol);
                                                         return (
                                                             <>
-                                                                <img
-                                                                    src={icons.token1Icon}
-                                                                    alt="Token 1"
-                                                                    className="w-10 h-10 rounded-full border-4 border-card z-10"
-                                                                    onError={(e) => {
-                                                                        e.currentTarget.style.display = 'none';
-                                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                                                    }}
-                                                                />
-                                                                <div
-                                                                    className="w-10 h-10 rounded-full border-4 border-card z-10 hidden"
-                                                                    style={{ backgroundColor: pool.color1 }}
-                                                                />
-                                                                <img
-                                                                    src={icons.token2Icon}
-                                                                    alt="Token 2"
-                                                                    className="w-10 h-10 rounded-full border-4 border-card"
-                                                                    onError={(e) => {
-                                                                        e.currentTarget.style.display = 'none';
-                                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                                                    }}
-                                                                />
-                                                                <div
-                                                                    className="w-10 h-10 rounded-full border-4 border-card hidden"
-                                                                    style={{ backgroundColor: pool.color2 }}
-                                                                />
+                                                                <img src={icons.token1Icon} alt="Token 1" className="w-10 h-10 rounded-full border-4 border-card z-10"
+                                                                    onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextElementSibling?.classList.remove("hidden"); }} />
+                                                                <div className="w-10 h-10 rounded-full border-4 border-card z-10 hidden" style={{ backgroundColor: pool.color1 }} />
+                                                                <img src={icons.token2Icon} alt="Token 2" className="w-10 h-10 rounded-full border-4 border-card"
+                                                                    onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextElementSibling?.classList.remove("hidden"); }} />
+                                                                <div className="w-10 h-10 rounded-full border-4 border-card hidden" style={{ backgroundColor: pool.color2 }} />
                                                             </>
                                                         );
                                                     })()}
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold group-hover:text-primary transition-colors">
-                                                        {pool.name}
-                                                    </div>
+                                                    <div className="font-bold group-hover:text-primary transition-colors">{pool.name}</div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] bg-secondary/50 px-1.5 py-0.5 rounded font-bold uppercase">
-                                                            {pool.version}
-                                                        </span>
-                                                        <span className="text-[10px] text-secondary-foreground font-bold">
-                                                            {pool.fee}
-                                                        </span>
-                                                        <span className="text-[10px] text-secondary-foreground">
-                                                            {pool.chain}
-                                                        </span>
+                                                        <span className="text-[10px] bg-secondary/50 px-1.5 py-0.5 rounded font-bold uppercase">{pool.version}</span>
+                                                        <span className="text-[10px] text-secondary-foreground font-bold">{pool.fee}</span>
+                                                        <span className="text-[10px] text-secondary-foreground">{pool.chain}</span>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <div className="text-sm font-mono font-bold text-success">
-                                                    {formatApy(pool.apy)} APY
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <div className="text-sm font-mono font-bold text-success">{formatApy(pool.apy)} APY</div>
+                                                    <div className="text-[10px] text-secondary-foreground font-bold">TVL: {formatTvl(pool.tvlUsd)}</div>
                                                 </div>
-                                                <div className="text-[10px] text-secondary-foreground font-bold">
-                                                    TVL: {formatTvl(pool.tvlUsd)}
-                                                </div>
+                                                <ChevronRight className="w-4 h-4 text-secondary-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                                             </div>
                                         </motion.div>
                                     ))}
@@ -312,14 +256,13 @@ export default function PoolsPage() {
                             )}
                         </div>
 
-                        {/* Data attribution */}
                         <div className="mt-2 text-xs text-secondary-foreground text-center">
-                            Pool data from DeFiLlama • Real-time APY and TVL
+                            Pool data from DeFiLlama &bull; Real-time APY and TVL &bull; Click any pool to open a HedgeLP position
                         </div>
                     </section>
                 </div>
 
-                {/* Right Column: Rewards & Learn */}
+                {/* Right Column */}
                 <div className="lg:col-span-4 space-y-8">
 
                     {/* Pools with rewards */}
@@ -351,6 +294,7 @@ export default function PoolsPage() {
                                         key={pool.id}
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
+                                        onClick={() => handlePoolClick(pool)}
                                         className="p-4 rounded-2xl border bg-gradient-to-br from-card to-card/50 hover:border-primary/50 transition-all cursor-pointer"
                                     >
                                         <div className="flex items-center justify-between mb-3">
@@ -360,32 +304,12 @@ export default function PoolsPage() {
                                                         const icons = getTokenIconFromSymbol(pool.symbol);
                                                         return (
                                                             <>
-                                                                <img
-                                                                    src={icons.token1Icon}
-                                                                    alt="Token 1"
-                                                                    className="w-8 h-8 rounded-full border-2 border-card"
-                                                                    onError={(e) => {
-                                                                        e.currentTarget.style.display = 'none';
-                                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                                                    }}
-                                                                />
-                                                                <div
-                                                                    className="w-8 h-8 rounded-full border-2 border-card hidden"
-                                                                    style={{ backgroundColor: pool.color1 }}
-                                                                />
-                                                                <img
-                                                                    src={icons.token2Icon}
-                                                                    alt="Token 2"
-                                                                    className="w-8 h-8 rounded-full border-2 border-card"
-                                                                    onError={(e) => {
-                                                                        e.currentTarget.style.display = 'none';
-                                                                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                                                    }}
-                                                                />
-                                                                <div
-                                                                    className="w-8 h-8 rounded-full border-2 border-card hidden"
-                                                                    style={{ backgroundColor: pool.color2 }}
-                                                                />
+                                                                <img src={icons.token1Icon} alt="" className="w-8 h-8 rounded-full border-2 border-card"
+                                                                    onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextElementSibling?.classList.remove("hidden"); }} />
+                                                                <div className="w-8 h-8 rounded-full border-2 border-card hidden" style={{ backgroundColor: pool.color1 }} />
+                                                                <img src={icons.token2Icon} alt="" className="w-8 h-8 rounded-full border-2 border-card"
+                                                                    onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextElementSibling?.classList.remove("hidden"); }} />
+                                                                <div className="w-8 h-8 rounded-full border-2 border-card hidden" style={{ backgroundColor: pool.color2 }} />
                                                             </>
                                                         );
                                                     })()}
@@ -398,31 +322,19 @@ export default function PoolsPage() {
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
                                             <div className="p-2 rounded-xl bg-secondary/20">
-                                                <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider mb-0.5">
-                                                    Base APR
-                                                </div>
-                                                <div className="text-sm font-mono font-bold">
-                                                    {formatApy(pool.apyBase)}
-                                                </div>
+                                                <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider mb-0.5">Base APR</div>
+                                                <div className="text-sm font-mono font-bold">{formatApy(pool.apyBase)}</div>
                                             </div>
                                             <div className="p-2 rounded-xl bg-primary/5">
-                                                <div className="text-[9px] text-primary uppercase font-bold tracking-wider mb-0.5">
-                                                    Reward APR
-                                                </div>
-                                                <div className="text-sm font-mono font-bold text-primary">
-                                                    +{formatApy(pool.apyReward)}
-                                                </div>
+                                                <div className="text-[9px] text-primary uppercase font-bold tracking-wider mb-0.5">Reward APR</div>
+                                                <div className="text-sm font-mono font-bold text-primary">+{formatApy(pool.apyReward)}</div>
                                             </div>
                                         </div>
-                                        <div className="mt-2 text-[10px] text-secondary-foreground">
-                                            TVL: {formatTvl(pool.tvlUsd)} • {pool.chain}
-                                        </div>
+                                        <div className="mt-2 text-[10px] text-secondary-foreground">TVL: {formatTvl(pool.tvlUsd)} &bull; {pool.chain}</div>
                                     </motion.div>
                                 ))
                             ) : (
-                                <div className="p-6 text-center text-secondary-foreground text-sm">
-                                    No reward pools available
-                                </div>
+                                <div className="p-6 text-center text-secondary-foreground text-sm">No reward pools available</div>
                             )}
                         </div>
                     </section>
@@ -447,7 +359,7 @@ export default function PoolsPage() {
                             </div>
                         </div>
                         <button
-                            onClick={() => window.location.href = '/dashboard'}
+                            onClick={() => window.location.href = "/dashboard"}
                             className="w-full py-3 bg-primary text-primary-foreground rounded-xl font-bold hover:opacity-90 transition-all"
                         >
                             Explore Vault
@@ -465,9 +377,7 @@ export default function PoolsPage() {
                                 "Impermanent loss explained",
                             ].map((item, i) => (
                                 <div key={i} className="flex items-center justify-between group cursor-pointer">
-                                    <span className="text-sm font-medium text-secondary-foreground group-hover:text-foreground transition-colors">
-                                        {item}
-                                    </span>
+                                    <span className="text-sm font-medium text-secondary-foreground group-hover:text-foreground transition-colors">{item}</span>
                                     <ArrowUpRight className="w-4 h-4 text-secondary-foreground group-hover:text-primary transition-colors" />
                                 </div>
                             ))}
@@ -475,6 +385,16 @@ export default function PoolsPage() {
                     </section>
                 </div>
             </div>
+
+            {/* Pool Deposit Modal */}
+            <AnimatePresence>
+                <PoolDepositModal
+                    isOpen={showDepositModal}
+                    onClose={() => { setShowDepositModal(false); setSelectedPool(null); }}
+                    pool={selectedPool}
+                    onSuccess={handleDepositSuccess}
+                />
+            </AnimatePresence>
         </main>
     );
 }

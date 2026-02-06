@@ -4,14 +4,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { type ReactNode, useState } from "react";
 import { WagmiProvider, createConfig, http } from "wagmi";
-import { mainnet, sepolia, arbitrum, base } from "wagmi/chains";
+import { mainnet, sepolia, arbitrum, base, foundry } from "wagmi/chains";
 import { injected, walletConnect, coinbaseWallet } from "wagmi/connectors";
 
 // WalletConnect Project ID - get from cloud.walletconnect.com
 const WALLETCONNECT_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo";
 
 const config = createConfig({
-    chains: [arbitrum, base, mainnet, sepolia],
+    chains: [arbitrum, base, mainnet, sepolia, foundry],
     connectors: [
         injected(),
         walletConnect({ 
@@ -30,6 +30,7 @@ const config = createConfig({
         [base.id]: http(),
         [mainnet.id]: http(),
         [sepolia.id]: http(),
+        [foundry.id]: http(),
     },
 });
 

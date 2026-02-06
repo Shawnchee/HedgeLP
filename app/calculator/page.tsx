@@ -71,7 +71,7 @@ export default function CalculatorPage() {
     const [lpPercent, setLpPercent] = useState(80);
     const [scenario, setScenario] = useState<Scenario>("sideways");
     const [customPriceChange, setCustomPriceChange] = useState(0);
-    const [lpApr, setLpApr] = useState(45);
+    const [lpApr, setLpApr] = useState(100);
     const [fundingRate, setFundingRate] = useState(0.015); // Daily rate as percentage
     const [autoCompound, setAutoCompound] = useState(true);
     const [compoundFrequency, setCompoundFrequency] = useState<"daily" | "weekly" | "monthly">("weekly");
@@ -408,7 +408,7 @@ export default function CalculatorPage() {
                                     <input
                                         type="range"
                                         min="0"
-                                        max="200"
+                                        max="1000"
                                         value={lpApr}
                                         onChange={(e) => setLpApr(Number(e.target.value))}
                                         className="w-full h-2 bg-secondary/50 rounded-full appearance-none cursor-pointer accent-primary"

@@ -1,200 +1,115 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useAccount, useSignMessage } from "wagmi";
+import { useState } from "react";
 
-export type TransactionStatus = 
-    | "idle" 
-    | "confirming" 
-    | "signing" 
-    | "pending" 
-    | "success" 
-    | "error" 
-    | "rejected";
-
-export interface TransactionResult {
-    status: TransactionStatus;
-    txHash: string | null;
-    error: string | null;
+interface MockTransactionOptions {
+    onSuccess?: () => void;
+    onError?: (error: Error) => void;
 }
 
-interface UseMockTransactionOptions {
-    onSuccess?: (txHash: string) => void;
-    onError?: (error: string) => void;
-    onRejected?: () => void;
+export function useMockDeposit(options?: MockTransactionOptions) {
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSuccess, setIsSuccess] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+
+    const deposit = async (amount: string) => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            setIsSuccess(true);
+            options?.onSuccess?.();
+        } catch (e) {
+            setError(e as Error);
+            options?.onError?.(e as Error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return { deposit, isLoading, isSuccess, error };
 }
 
-// Generate a mock transaction hash
-function generateMockTxHash(): string {
-    return `0x${Array.from({ length: 64 }, () => 
-        Math.floor(Math.random() * 16).toString(16)
-    ).join('')}`;
+export function useMockWithdraw(options?: MockTransactionOptions) {
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSuccess, setIsSuccess] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+
+    const withdraw = async (amount: string) => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            setIsSuccess(true);
+            options?.onSuccess?.();
+        } catch (e) {
+            setError(e as Error);
+            options?.onError?.(e as Error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return { withdraw, isLoading, isSuccess, error };
 }
 
-/**
- * Hook for simulating genuine transaction flows with real wallet signing
- * but mock transaction outcomes. Useful for demo/testnet scenarios.
- */
-export function useMockTransaction(options: UseMockTransactionOptions = {}) {
-    const { isConnected } = useAccount();
-    const { signMessageAsync } = useSignMessage();
-    
-    const [status, setStatus] = useState<TransactionStatus>("idle");
+type SwapStatus = "idle" | "confirming" | "signing" | "pending" | "success" | "rejected";
+
+interface SwapParams {
+    fromToken: string;
+    toToken: string;
+    fromAmount: string;
+    toAmount: string;
+}
+
+export function useMockSwap(options?: MockTransactionOptions) {
+    const [status, setStatus] = useState<SwapStatus>("idle");
     const [txHash, setTxHash] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isRejected, setIsRejected] = useState(false);
 
-    const reset = useCallback(() => {
-        setStatus("idle");
-        setTxHash(null);
+    const swap = async (params: SwapParams) => {
+        setIsLoading(true);
         setError(null);
-    }, []);
-
-    const execute = useCallback(async (params: {
-        type: "deposit" | "withdraw" | "swap" | "approve";
-        amount?: string;
-        token?: string;
-        description?: string;
-    }) => {
-        if (!isConnected) {
-            setError("Wallet not connected");
-            setStatus("error");
-            return;
-        }
+        setIsRejected(false);
+        setTxHash(null);
 
         try {
-            // Step 1: Show confirmation
+            // Step 1: Confirming
             setStatus("confirming");
-            setError(null);
-            setTxHash(null);
-            
-            // Brief delay for UI
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise(resolve => setTimeout(resolve, 800));
 
-            // Step 2: Request wallet signature
+            // Step 2: Signing
             setStatus("signing");
-            
-            // Create a message that looks like a real transaction
-            const message = `HedgeLP ${params.type.toUpperCase()} Request
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
-Amount: ${params.amount || "N/A"}
-Token: ${params.token || "USDC"}
-Action: ${params.description || params.type}
-Timestamp: ${new Date().toISOString()}
-Nonce: ${Math.floor(Math.random() * 1000000)}
-
-By signing this message, you authorize HedgeLP to execute this transaction on your behalf.`;
-
-            try {
-                // This will trigger the actual wallet popup
-                await signMessageAsync({ message });
-            } catch (signError: any) {
-                // User rejected the signature
-                if (signError.message?.includes("rejected") || 
-                    signError.message?.includes("denied") ||
-                    signError.code === 4001) {
-                    setStatus("rejected");
-                    setError("Transaction rejected by user");
-                    options.onRejected?.();
-                    return;
-                }
-                throw signError;
-            }
-
-            // Step 3: Transaction pending (mock)
+            // Step 3: Pending
             setStatus("pending");
-            const mockHash = generateMockTxHash();
+            const mockHash = "0x" + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
             setTxHash(mockHash);
-
-            // Simulate blockchain confirmation time
-            await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
             // Step 4: Success
             setStatus("success");
-            options.onSuccess?.(mockHash);
-
-        } catch (err: any) {
-            console.error("Transaction error:", err);
-            setStatus("error");
-            setError(err.message || "Transaction failed");
-            options.onError?.(err.message || "Transaction failed");
+            options?.onSuccess?.();
+        } catch (e) {
+            setError((e as Error).message || "Transaction failed");
+            setStatus("rejected");
+            setIsRejected(true);
+            options?.onError?.(e as Error);
+        } finally {
+            setIsLoading(false);
         }
-    }, [isConnected, signMessageAsync, options]);
-
-    return {
-        execute,
-        reset,
-        status,
-        txHash,
-        error,
-        isLoading: status === "confirming" || status === "signing" || status === "pending",
-        isSuccess: status === "success",
-        isError: status === "error",
-        isRejected: status === "rejected",
     };
-}
 
-/**
- * Hook for mock token approval flow
- */
-export function useMockApprove() {
-    return useMockTransaction();
-}
+    const reset = () => {
+        setStatus("idle");
+        setTxHash(null);
+        setError(null);
+        setIsLoading(false);
+        setIsRejected(false);
+    };
 
-/**
- * Hook for mock deposit flow
- */
-export function useMockDeposit(options: UseMockTransactionOptions = {}) {
-    const tx = useMockTransaction(options);
-    
-    const deposit = useCallback((amount: string) => {
-        return tx.execute({
-            type: "deposit",
-            amount,
-            token: "USDC",
-            description: `Deposit ${amount} USDC to HedgeLP Vault`,
-        });
-    }, [tx]);
-
-    return { ...tx, deposit };
-}
-
-/**
- * Hook for mock withdraw flow
- */
-export function useMockWithdraw(options: UseMockTransactionOptions = {}) {
-    const tx = useMockTransaction(options);
-    
-    const withdraw = useCallback((amount: string) => {
-        return tx.execute({
-            type: "withdraw",
-            amount,
-            token: "USDC",
-            description: `Withdraw ${amount} USDC from HedgeLP Vault`,
-        });
-    }, [tx]);
-
-    return { ...tx, withdraw };
-}
-
-/**
- * Hook for mock swap flow
- */
-export function useMockSwap(options: UseMockTransactionOptions = {}) {
-    const tx = useMockTransaction(options);
-    
-    const swap = useCallback((params: {
-        fromToken: string;
-        toToken: string;
-        fromAmount: string;
-        toAmount: string;
-    }) => {
-        return tx.execute({
-            type: "swap",
-            amount: params.fromAmount,
-            token: params.fromToken,
-            description: `Swap ${params.fromAmount} ${params.fromToken} for ${params.toAmount} ${params.toToken}`,
-        });
-    }, [tx]);
-
-    return { ...tx, swap };
+    return { swap, status, txHash, error, reset, isLoading, isRejected };
 }

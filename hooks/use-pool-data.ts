@@ -143,7 +143,7 @@ export function useUniswapPools(chain: string = "Ethereum") {
 
 // ============ Top Pools by TVL Hook ============
 
-export function useTopPools(limit: number = 10) {
+export function useTopPools(limit: number = 50) {
     return useQuery<Pool[]>({
         queryKey: ["top-pools", limit],
         queryFn: async () => {
@@ -160,13 +160,12 @@ export function useTopPools(limit: number = 10) {
                     throw new Error(data.error);
                 }
 
-                // Get top pools by TVL (Uniswap + Curve + Aave)
+                // Get top Uniswap pools by TVL
+                // Fetch a larger set (e.g. 100) to ensure we have enough data for client-side sorting by APY
                 const topPools = data.data
                     .filter((pool: any) =>
-                        (pool.project.toLowerCase().includes("uniswap") ||
-                            pool.project.toLowerCase().includes("curve") ||
-                            pool.project.toLowerCase().includes("aave")) &&
-                        pool.tvlUsd > 1000000 // Min $1M TVL
+                        pool.project.toLowerCase().includes("uniswap") &&
+                        pool.tvlUsd > 1000000 // Min $1M TVL to avoid junk
                     )
                     .sort((a: any, b: any) => b.tvlUsd - a.tvlUsd)
                     .slice(0, limit)

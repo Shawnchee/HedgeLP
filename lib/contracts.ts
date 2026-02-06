@@ -14,9 +14,15 @@ export const CONTRACTS = {
     },
     // Sepolia (testnet)
     11155111: {
-        vault: "0x0000000000000000000000000000000000000000", // TODO: Deploy
-        usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-        weth: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+        vault: "0xBb2180ebd78ce97360503434eD37fcf4a1Df61c3",
+        usdc: "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+        weth: "0x34A1D3fff3958843C43aD80F30b94c510645C316",
+    },
+    // Foundry (Local)
+    31337: {
+        vault: "0xBb2180ebd78ce97360503434eD37fcf4a1Df61c3",
+        usdc: "0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496",
+        weth: "0x34A1D3fff3958843C43aD80F30b94c510645C316",
     },
 } as const;
 

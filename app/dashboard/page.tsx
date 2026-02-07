@@ -17,6 +17,9 @@ import {
     Wallet,
     ShieldCheck,
     Clock,
+    TrendingDown,
+    ExternalLink,
+    Wifi,
 } from "lucide-react";
 import {
     Area,
@@ -32,6 +35,8 @@ import Link from "next/link";
 import { useAccount, useBalance } from "wagmi";
 import { useMockDeposit, useMockWithdraw } from "@/hooks/use-mock-transaction";
 import { usePositions, type VaultPosition } from "@/hooks/use-positions";
+import { useTokenPrices } from "@/hooks/use-market-data";
+import { computePositionPnL } from "@/hooks/use-position-pnl";
 
 // =============================================================
 // Generate deterministic 30-day portfolio chart data from positions
@@ -98,6 +103,14 @@ export default function DashboardPage() {
 
     const { positions: portfolio, loaded, updatePosition, removePosition } = usePositions();
 
+    // Live ETH price for real-time PnL
+    const { data: tokenPrices } = useTokenPrices();
+    const ethPrice = useMemo(() => {
+        if (!tokenPrices) return 0;
+        const eth = tokenPrices.find((t) => t.id === "ethereum");
+        return eth?.current_price ?? 0;
+    }, [tokenPrices]);
+
     const [activeTab, setActiveTab] = useState<"deposit" | "withdraw">("deposit");
     const [inputAmount, setInputAmount] = useState("");
     const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -158,8 +171,58 @@ export default function DashboardPage() {
     };
 
     const handleManageSave = useCallback((id: string, updates: { lpPercent: number; hedgePercent: number; autoCompound: boolean; autoStopLoss: boolean }) => {
-        updatePosition(id, updates);
-    }, [updatePosition]);
+        // Find the position being rebalanced
+        const pos = portfolio.find(p => p.id === id);
+
+        // For real on-chain positions, recalculate underlying ETH/USDC amounts
+        // based on the new allocation. This simulates closing old positions and
+        // reopening at current price with the new LP/Hedge split.
+        if (pos?.isReal && ethPrice > 0) {
+            const pnlData = computePositionPnL(pos, ethPrice);
+            const totalValue = pnlData.totalValueNow;
+
+            const newLpPercent = updates.lpPercent;
+            const newHedgePercent = updates.hedgePercent;
+
+            // New LP value: ~50% WETH + ~50% USDC (standard Uniswap LP split)
+            const newLpValue = totalValue * newLpPercent / 100;
+            const newLpWethKept = (newLpValue / 2) / ethPrice;
+            const newLpUsdcReceived = newLpValue / 2;
+
+            // New hedge: sell ETH for USDC at current price (1x short)
+            const newHedgeValue = totalValue * newHedgePercent / 100;
+            const newHedgeEthAmount = newHedgeValue / ethPrice;
+            const newHedgeUsdc = newHedgeValue;
+
+            // New delta-neutral tracking
+            const newHedgeCoverage = newLpWethKept > 0
+                ? (newHedgeEthAmount / newLpWethKept) * 100
+                : newHedgeEthAmount > 0 ? 100 : 0;
+
+            updatePosition(id, {
+                ...updates,
+                // Reset entry price to current (rebalance = new trade at current price)
+                ethPriceAtDeposit: ethPrice,
+                // Recalculated LP data
+                lpWethKept: newLpWethKept.toFixed(18),
+                lpUsdcReceived: newLpUsdcReceived.toFixed(2),
+                lpEthExposure: newLpWethKept.toFixed(18),
+                lpValueUsd: newLpValue,
+                lpEthAmount: ((newLpWethKept * 2)).toFixed(18), // total LP ETH (both sides)
+                // Recalculated hedge data
+                hedgeEthAmount: newHedgeEthAmount.toFixed(18),
+                hedgeUsdcReceived: newHedgeUsdc.toFixed(2),
+                hedgeValueUsd: newHedgeValue,
+                shortSizeEth: newHedgeEthAmount.toFixed(18),
+                // Updated totals
+                totalUsdcReceived: (newLpUsdcReceived + newHedgeUsdc).toFixed(2),
+                hedgeCoverage: newHedgeCoverage,
+                currentValue: totalValue,
+            });
+        } else {
+            updatePosition(id, updates);
+        }
+    }, [updatePosition, portfolio, ethPrice]);
 
     const handleCloseConfirm = useCallback((id: string) => {
         removePosition(id);
@@ -202,7 +265,7 @@ export default function DashboardPage() {
                             <span className="font-medium text-success">Connected</span>
                         </div>
                         <span className="font-mono text-secondary-foreground">{address?.slice(0, 6)}...{address?.slice(-4)}</span>
-                        {balance && <span className="text-secondary-foreground">&bull; {parseFloat(balance.formatted).toFixed(4)} {balance.symbol}</span>}
+                        {balance && <span className="text-secondary-foreground">&bull; {(Number(balance.value) / 10 ** balance.decimals).toFixed(4)} {balance.symbol}</span>}
                     </motion.div>
 
                     {/* Portfolio Stats */}
@@ -269,7 +332,7 @@ export default function DashboardPage() {
                                         <YAxis domain={["dataMin - 200", "dataMax + 200"]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`} />
                                         <Tooltip
                                             contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: "12px" }}
-                                            formatter={(value: number) => [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "Value"]}
+                                            formatter={(value: number | undefined) => [`$${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`, "Value"]}
                                         />
                                         <Area type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} fill="url(#portfolioGrad)" dot={false} />
                                     </AreaChart>
@@ -302,7 +365,11 @@ export default function DashboardPage() {
                             </div>
                         ) : (
                             <div className="divide-y">
-                                {portfolio.map((pos, i) => (
+                                {portfolio.map((pos, i) => {
+                                    // Compute real-time PnL for on-chain positions
+                                    const pnl = pos.isReal ? computePositionPnL(pos, ethPrice) : null;
+
+                                    return (
                                     <motion.div
                                         key={pos.id}
                                         initial={{ opacity: 0, y: 10 }}
@@ -318,7 +385,15 @@ export default function DashboardPage() {
                                                     <img src={pos.icon2} alt="" className="w-9 h-9 rounded-full border-2 border-card" onError={(e) => { (e.target as HTMLElement).style.backgroundColor = pos.color2; }} />
                                                 </div>
                                                 <div>
-                                                    <div className="font-bold">{pos.pool}</div>
+                                                    <div className="font-bold flex items-center gap-2">
+                                                        {pos.pool}
+                                                        {pos.isReal && (
+                                                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 border border-success/30">
+                                                                <Wifi className="w-2.5 h-2.5 text-success" />
+                                                                <span className="text-[9px] font-bold text-success">LIVE</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-[10px] bg-secondary/50 px-1.5 py-0.5 rounded font-bold">{pos.protocol}</span>
                                                         <span className="text-[10px] text-secondary-foreground">{pos.chain}</span>
@@ -326,44 +401,152 @@ export default function DashboardPage() {
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className="font-mono font-bold">${pos.currentValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                                                <div className={`text-xs font-mono font-bold ${pos.pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                                                    {pos.pnl >= 0 ? "+" : ""}{pos.pnlPercent.toFixed(2)}%
-                                                </div>
+                                                {pnl?.isReal ? (
+                                                    <>
+                                                        <div className="font-mono font-bold">${pnl.totalValueNow.toFixed(2)}</div>
+                                                        <div className={`text-xs font-mono font-bold ${pnl.netPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                                                            {pnl.netPnl >= 0 ? "+" : ""}{pnl.netPnlPercent.toFixed(2)}%
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div className="font-mono font-bold">${pos.currentValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                                                        <div className={`text-xs font-mono font-bold ${pos.pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                                                            {pos.pnl >= 0 ? "+" : ""}{pos.pnlPercent.toFixed(2)}%
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
 
-                                        {/* Row 2: Details */}
-                                        <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
-                                            <div className="p-2 rounded-lg bg-secondary/10">
-                                                <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">Allocation</div>
-                                                <div className="text-xs font-mono font-bold mt-0.5">
-                                                    <span className="text-primary">{pos.lpPercent}%</span><span className="text-secondary-foreground mx-1">/</span><span className="text-success">{pos.hedgePercent}%</span>
+                                        {/* Row 2: Details — enhanced for real positions */}
+                                        {pnl?.isReal ? (
+                                            <div className="mt-3 space-y-2">
+                                                {/* LP + Short PnL row */}
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <div className="p-2 rounded-lg bg-primary/5 border border-primary/10">
+                                                        <div className="text-[9px] text-primary uppercase font-bold tracking-wider">LP P&L</div>
+                                                        <div className={`text-xs font-mono font-bold mt-0.5 ${pnl.lpPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                                                            {pnl.lpPnl >= 0 ? "+" : ""}${pnl.lpPnl.toFixed(2)}
+                                                        </div>
+                                                        <div className="text-[9px] text-secondary-foreground font-mono">{pnl.lpEthExposure.toFixed(4)} ETH</div>
+                                                        <div className="text-[9px] text-secondary-foreground font-mono">${pnl.lpValueNow.toFixed(2)}</div>
+                                                    </div>
+                                                    <div className="p-2 rounded-lg bg-success/5 border border-success/10">
+                                                        <div className="text-[9px] text-success uppercase font-bold tracking-wider flex items-center gap-1">
+                                                            <TrendingDown className="w-3 h-3" /> 1x Short P&L
+                                                        </div>
+                                                        <div className={`text-xs font-mono font-bold mt-0.5 ${pnl.shortPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                                                            {pnl.shortPnl >= 0 ? "+" : ""}${pnl.shortPnl.toFixed(2)}
+                                                        </div>
+                                                        <div className="text-[9px] text-secondary-foreground font-mono">{pnl.shortSizeEth.toFixed(4)} ETH short</div>
+                                                        <div className="text-[9px] text-secondary-foreground font-mono">${pnl.hedgeValueNow.toFixed(2)} USDC</div>
+                                                    </div>
+                                                    <div className="p-2 rounded-lg bg-secondary/10">
+                                                        <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">Net P&L</div>
+                                                        <div className={`text-xs font-mono font-bold mt-0.5 ${pnl.netPnl >= 0 ? "text-success" : "text-destructive"}`}>
+                                                            {pnl.netPnl >= 0 ? "+" : ""}${pnl.netPnl.toFixed(2)}
+                                                        </div>
+                                                        <div className="text-[9px] text-secondary-foreground font-mono">
+                                                            {pnl.netPnlPercent >= 0 ? "+" : ""}{pnl.netPnlPercent.toFixed(3)}%
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {/* ETH price + allocation + funding row */}
+                                                <div className="grid grid-cols-5 gap-2">
+                                                    <div className="p-2 rounded-lg bg-secondary/10">
+                                                        <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">ETH Now</div>
+                                                        <div className="text-xs font-mono font-bold mt-0.5">${pnl.currentPrice.toFixed(0)}</div>
+                                                        <div className={`text-[9px] font-mono ${pnl.ethPriceChangePercent >= 0 ? "text-success" : "text-destructive"}`}>
+                                                            {pnl.ethPriceChangePercent >= 0 ? "+" : ""}{pnl.ethPriceChangePercent.toFixed(2)}%
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-2 rounded-lg bg-secondary/10">
+                                                        <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">Entry</div>
+                                                        <div className="text-xs font-mono font-bold mt-0.5">${pnl.entryPrice.toFixed(0)}</div>
+                                                    </div>
+                                                    <div className="p-2 rounded-lg bg-secondary/10">
+                                                        <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">Alloc</div>
+                                                        <div className="text-xs font-mono font-bold mt-0.5">
+                                                            <span className="text-primary">{pos.lpPercent}%</span><span className="text-secondary-foreground mx-0.5">/</span><span className="text-success">{pos.hedgePercent}%</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-2 rounded-lg bg-secondary/10">
+                                                        <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">Coverage</div>
+                                                        <div className="text-xs font-mono font-bold text-success mt-0.5">{(pos.hedgeCoverage ?? 0).toFixed(0)}%</div>
+                                                    </div>
+                                                    <div className="p-2 rounded-lg bg-warning/5 border border-warning/10">
+                                                        <div className="text-[9px] text-warning uppercase font-bold tracking-wider">Funding/8h</div>
+                                                        <div className="text-xs font-mono font-bold mt-0.5 text-success">
+                                                            {pnl.fundingRate8h === 0 ? "0.00%" : `${pnl.fundingRate8h.toFixed(3)}%`}
+                                                        </div>
+                                                        <div className="text-[9px] text-secondary-foreground font-mono">
+                                                            {pnl.fundingRate8h === 0 ? "Spot hedge" : `-$${pnl.accumulatedFundingCost.toFixed(2)}`}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {/* Tx proof link for short position */}
+                                                {pos.txHash && (
+                                                    <div className="p-2 rounded-lg bg-primary/5 border border-primary/10 flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <Shield className="w-3.5 h-3.5 text-primary" />
+                                                            <div>
+                                                                <div className="text-[9px] text-primary uppercase font-bold tracking-wider">On-Chain Proof (Sepolia)</div>
+                                                                <div className="text-[9px] text-secondary-foreground font-mono">
+                                                                    LP swap + 1x Short swap in single tx
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <a
+                                                            href={`https://sepolia.etherscan.io/tx/${pos.txHash}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-bold hover:bg-primary/20 transition-colors"
+                                                        >
+                                                            <ExternalLink className="w-3 h-3" />
+                                                            View on Etherscan
+                                                        </a>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div className="p-2 rounded-lg bg-secondary/10">
+                                                    <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">Allocation</div>
+                                                    <div className="text-xs font-mono font-bold mt-0.5">
+                                                        <span className="text-primary">{pos.lpPercent}%</span><span className="text-secondary-foreground mx-1">/</span><span className="text-success">{pos.hedgePercent}%</span>
+                                                    </div>
+                                                </div>
+                                                <div className="p-2 rounded-lg bg-secondary/10">
+                                                    <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">APY</div>
+                                                    <div className="text-xs font-mono font-bold text-success mt-0.5">{pos.apy.toFixed(1)}%</div>
+                                                </div>
+                                                <div className="p-2 rounded-lg bg-secondary/10">
+                                                    <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">P&L</div>
+                                                    <div className={`text-xs font-mono font-bold mt-0.5 ${pos.pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                                                        {pos.pnl >= 0 ? "+" : ""}${pos.pnl.toFixed(2)}
+                                                    </div>
+                                                </div>
+                                                <div className="p-2 rounded-lg bg-secondary/10">
+                                                    <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">Features</div>
+                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                        {pos.autoCompound && <span className="text-[9px] font-bold text-primary flex items-center gap-0.5"><RefreshCw className="w-3 h-3" /> Compound</span>}
+                                                        {pos.autoStopLoss && <span className="text-[9px] font-bold text-success flex items-center gap-0.5"><Shield className="w-3 h-3" /> Stop</span>}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="p-2 rounded-lg bg-secondary/10">
-                                                <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">APY</div>
-                                                <div className="text-xs font-mono font-bold text-success mt-0.5">{pos.apy.toFixed(1)}%</div>
-                                            </div>
-                                            <div className="p-2 rounded-lg bg-secondary/10">
-                                                <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">P&L</div>
-                                                <div className={`text-xs font-mono font-bold mt-0.5 ${pos.pnl >= 0 ? "text-success" : "text-destructive"}`}>
-                                                    {pos.pnl >= 0 ? "+" : ""}${pos.pnl.toFixed(2)}
-                                                </div>
-                                            </div>
-                                            <div className="p-2 rounded-lg bg-secondary/10">
-                                                <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">Features</div>
-                                                <div className="flex items-center gap-1.5 mt-0.5">
-                                                    {pos.autoCompound && <span className="text-[9px] font-bold text-primary flex items-center gap-0.5"><RefreshCw className="w-3 h-3" /> Compound</span>}
-                                                    {pos.autoStopLoss && <span className="text-[9px] font-bold text-success flex items-center gap-0.5"><Shield className="w-3 h-3" /> Stop</span>}
-                                                </div>
-                                            </div>
-                                        </div>
+                                        )}
 
                                         {/* Row 3: Footer */}
                                         <div className="mt-3 flex items-center justify-between text-xs text-secondary-foreground">
                                             <div className="flex items-center gap-1">
                                                 <Clock className="w-3 h-3" /> Opened {pos.openedAt}
+                                                {pos.isReal && pos.txHash && (
+                                                    <a href={`https://sepolia.etherscan.io/tx/${pos.txHash}`} target="_blank" rel="noopener noreferrer"
+                                                        className="ml-2 flex items-center gap-1 text-primary hover:underline">
+                                                        <ExternalLink className="w-3 h-3" /> Tx
+                                                    </a>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <button
@@ -381,7 +564,8 @@ export default function DashboardPage() {
                                             </div>
                                         </div>
                                     </motion.div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </motion.section>
@@ -495,6 +679,7 @@ export default function DashboardPage() {
                     onClose={() => setManagingPosition(null)}
                     position={managingPosition}
                     onSave={handleManageSave}
+                    ethPrice={ethPrice}
                 />
             </AnimatePresence>
 

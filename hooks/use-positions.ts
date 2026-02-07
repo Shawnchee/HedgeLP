@@ -25,13 +25,57 @@ export interface VaultPosition {
     icon2: string;
     color1: string;
     color2: string;
+
+    // ============ Real on-chain data (Sepolia) ============
+    /** Whether this is a real on-chain position */
+    isReal?: boolean;
+    /** Network (e.g. "Sepolia") */
+    network?: string;
+    /** Total ETH deposited */
+    totalEthDeposited?: string;
+    /** ETH allocated to LP */
+    lpEthAmount?: string;
+    /** ETH kept as LP WETH side (returned via refundETH) */
+    lpWethKept?: string;
+    /** USDC received for LP pair side */
+    lpUsdcReceived?: string;
+    /** ETH allocated to Hedge (sold for USDC = 1x short) */
+    hedgeEthAmount?: string;
+    /** USDC received from hedge swap (= short entry size in USD) */
+    hedgeUsdcReceived?: string;
+    /** Total USDC received (LP side + hedge side) */
+    totalUsdcReceived?: string;
+    /** Single transaction hash (multicall) */
+    txHash?: string;
+    /** ETH price at time of deposit (USD) */
+    ethPriceAtDeposit?: number;
+    /** LP value in USD at deposit */
+    lpValueUsd?: number;
+    /** Hedge value in USD at deposit */
+    hedgeValueUsd?: number;
+    /** Deposit value in USD (real) */
+    depositedUsd?: number;
+
+    // ============ 1x Short / Delta-Neutral Tracking ============
+    /** 1x short size in ETH (= hedgeEthAmount) */
+    shortSizeEth?: string;
+    /** LP ETH exposure (= lpWethKept, the WETH side of the LP) */
+    lpEthExposure?: string;
+    /** Hedge coverage: shortSizeEth / lpEthExposure * 100 */
+    hedgeCoverage?: number;
+
+    // ============ Backward compat (old multi-tx format) ============
+    /** @deprecated Use txHash instead */
+    lpTxHash?: string | null;
+    /** @deprecated Use txHash instead */
+    hedgeTxHash?: string | null;
 }
 
 const SEED_POSITIONS: VaultPosition[] = [
     {
         id: "seed-1",
         pool: "WETH / USDC",
-        protocol: "Uniswap V3",
+        protocol: "Uniswap V4",
         chain: "Ethereum",
         deposited: 10000,
         currentValue: 10342.18,
@@ -52,7 +96,7 @@ const SEED_POSITIONS: VaultPosition[] = [
     {
         id: "seed-2",
         pool: "WBTC / WETH",
-        protocol: "Uniswap V3",
+        protocol: "Uniswap V4",
         chain: "Arbitrum",
         deposited: 25000,
         currentValue: 25821.50,
@@ -73,7 +117,7 @@ const SEED_POSITIONS: VaultPosition[] = [
     {
         id: "seed-3",
         pool: "ARB / USDC",
-        protocol: "Uniswap V3",
+        protocol: "Uniswap V4",
         chain: "Arbitrum",
         deposited: 5000,
         currentValue: 4872.30,

@@ -85,14 +85,15 @@ export default function TokenDetailPage() {
     };
 
     // Token config fallback
-    const tokenConfig = Object.values(SUPPORTED_TOKENS).find(t => t.id === id) || {
-        id: id as string,
-        symbol: "TOKEN",
-        name: "Token",
-        color: "#627EEA",
-        decimals: 18,
-        image: "https://via.placeholder.com/48/627EEA/ffffff?text=TOKEN"
-    };
+    const tokenConfig: { id: string; symbol: string; name: string; color: string; decimals: number; image: string } =
+        Object.values(SUPPORTED_TOKENS).find(t => t.id === id) ?? {
+            id: id as string,
+            symbol: "TOKEN",
+            name: "Token",
+            color: "#627EEA",
+            decimals: 18,
+            image: "https://via.placeholder.com/48/627EEA/ffffff?text=TOKEN"
+        };
 
     // Price change color
     const priceChange = token?.price_change_percentage_24h || 0;

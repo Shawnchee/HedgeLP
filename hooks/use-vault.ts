@@ -137,7 +137,7 @@ export function usePreviewDeposit(amount: string) {
         abi: VAULT_ABI,
         functionName: "previewDeposit",
         args: [assets],
-        query: { enabled: !!vaultAddress && assets > 0n },
+        query: { enabled: !!vaultAddress && assets > BigInt(0) },
     });
 }
 

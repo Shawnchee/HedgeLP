@@ -16,11 +16,13 @@ interface ManageModalProps {
     onClose: () => void;
     position: VaultPosition | null;
     onSave: (id: string, updates: { lpPercent: number; hedgePercent: number; autoCompound: boolean; autoStopLoss: boolean }) => void;
+    /** Current ETH price for real position size calculations */
+    ethPrice?: number;
 }
 
 type ManageStep = "edit" | "signing" | "success";
 
-export function ManagePositionModal({ isOpen, onClose, position, onSave }: ManageModalProps) {
+export function ManagePositionModal({ isOpen, onClose, position, onSave, ethPrice = 0 }: ManageModalProps) {
     const [lpPercent, setLpPercent] = useState(position?.lpPercent ?? 80);
     const [autoCompound, setAutoCompound] = useState(position?.autoCompound ?? true);
     const [autoStopLoss, setAutoStopLoss] = useState(position?.autoStopLoss ?? true);
@@ -148,14 +150,32 @@ export function ManagePositionModal({ isOpen, onClose, position, onSave }: Manag
                                         <div className="font-mono font-bold text-primary">
                                             ${(position.currentValue * lpPercent / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                         </div>
+                                        {position.isReal && ethPrice > 0 && (
+                                            <div className="text-[10px] text-secondary-foreground font-mono mt-1">
+                                                {((position.currentValue * lpPercent / 100) / 2 / ethPrice).toFixed(4)} ETH exposure
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="p-3 rounded-xl bg-success/5 border border-success/20">
-                                        <div className="text-xs text-secondary-foreground mb-1">Hedge Position</div>
+                                        <div className="text-xs text-secondary-foreground mb-1">1x Short Position</div>
                                         <div className="font-mono font-bold text-success">
                                             ${(position.currentValue * hedgePercent / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                                         </div>
+                                        {position.isReal && ethPrice > 0 && (
+                                            <div className="text-[10px] text-secondary-foreground font-mono mt-1">
+                                                {((position.currentValue * hedgePercent / 100) / ethPrice).toFixed(4)} ETH short
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
+
+                                {/* Funding rate info for real positions */}
+                                {position.isReal && (
+                                    <div className="mt-3 p-2 rounded-lg bg-warning/5 border border-warning/10 flex items-center justify-between">
+                                        <div className="text-[10px] text-warning font-bold">Funding Rate (8h)</div>
+                                        <div className="text-[10px] font-mono font-bold text-success">0.00% (Spot Hedge)</div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Strategy Options */}
@@ -190,10 +210,46 @@ export function ManagePositionModal({ isOpen, onClose, position, onSave }: Manag
                                 <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs space-y-1">
                                     <div className="font-bold text-primary mb-1">Changes to apply:</div>
                                     {lpPercent !== position.lpPercent && (
-                                        <div className="flex justify-between">
-                                            <span className="text-secondary-foreground">Allocation</span>
-                                            <span><span className="line-through text-secondary-foreground">{position.lpPercent}/{position.hedgePercent}</span> &rarr; <span className="font-bold">{lpPercent}/{hedgePercent}</span></span>
-                                        </div>
+                                        <>
+                                            <div className="flex justify-between">
+                                                <span className="text-secondary-foreground">Allocation</span>
+                                                <span><span className="line-through text-secondary-foreground">{position.lpPercent}/{position.hedgePercent}</span> &rarr; <span className="font-bold">{lpPercent}/{hedgePercent}</span></span>
+                                            </div>
+                                            {position.isReal && ethPrice > 0 && (
+                                                <>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-secondary-foreground">LP size</span>
+                                                        <span className="font-mono">
+                                                            <span className="line-through text-secondary-foreground">${(position.currentValue * position.lpPercent / 100).toFixed(0)}</span>
+                                                            {" "}&rarr;{" "}
+                                                            <span className="font-bold text-primary">${(position.currentValue * lpPercent / 100).toFixed(0)}</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-secondary-foreground">Short size</span>
+                                                        <span className="font-mono">
+                                                            <span className="line-through text-secondary-foreground">${(position.currentValue * position.hedgePercent / 100).toFixed(0)}</span>
+                                                            {" "}&rarr;{" "}
+                                                            <span className="font-bold text-success">${(position.currentValue * hedgePercent / 100).toFixed(0)}</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-secondary-foreground">Short ETH</span>
+                                                        <span className="font-mono">
+                                                            <span className="line-through text-secondary-foreground">{((position.currentValue * position.hedgePercent / 100) / ethPrice).toFixed(4)}</span>
+                                                            {" "}&rarr;{" "}
+                                                            <span className="font-bold">{((position.currentValue * hedgePercent / 100) / ethPrice).toFixed(4)}</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="mt-1 pt-1 border-t border-primary/10">
+                                                        <div className="text-[10px] text-warning flex items-center gap-1">
+                                                            <Info className="w-3 h-3" />
+                                                            PnL will reset to $0 (re-entered at current ETH price)
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </>
                                     )}
                                     {autoCompound !== position.autoCompound && (
                                         <div className="flex justify-between">

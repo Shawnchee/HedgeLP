@@ -11,7 +11,7 @@ import { injected, walletConnect, coinbaseWallet } from "wagmi/connectors";
 const WALLETCONNECT_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo";
 
 const config = createConfig({
-    chains: [arbitrum, base, mainnet, sepolia, foundry],
+    chains: [sepolia, arbitrum, base, mainnet, foundry],
     connectors: [
         injected(),
         walletConnect({ 
@@ -26,10 +26,10 @@ const config = createConfig({
         coinbaseWallet({ appName: "HedgeLP" }),
     ],
     transports: {
+        [sepolia.id]: http("https://ethereum-sepolia-rpc.publicnode.com"),
         [arbitrum.id]: http(),
         [base.id]: http(),
         [mainnet.id]: http(),
-        [sepolia.id]: http(),
         [foundry.id]: http(),
     },
 });

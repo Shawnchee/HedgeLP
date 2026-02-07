@@ -1,13 +1,20 @@
 "use client";
 
 import { Header } from "@/components/header";
-import { Settings, ChevronDown, Info, Search, Zap, TrendingUp, ArrowUpDown, Loader2, CheckCircle, AlertCircle, ExternalLink } from "lucide-react";
-import { useState, useMemo, useEffect } from "react";
+import { Settings, ChevronDown, Info, Search, Zap, TrendingUp, ArrowUpDown, Loader2, CheckCircle, AlertCircle, ExternalLink, Shield, Wifi } from "lucide-react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount, useChainId, useBalance } from "wagmi";
 import { WalletButton } from "@/components/wallet-button";
 import { useTokenPrices, useExchangeRate, formatCurrency, SUPPORTED_TOKENS } from "@/hooks/use-market-data";
 import { useMockSwap } from "@/hooks/use-mock-transaction";
+import { useRealSwap, useTokenBalance, type SwapStatus as RealSwapStatus } from "@/hooks/use-real-swap";
+import {
+    SEPOLIA_TOKENS,
+    getSepoliaTokenList,
+    getSepoliaExplorerUrl,
+    type SepoliaToken,
+} from "@/lib/uniswap";
 
 interface Token {
     id: string;
@@ -17,10 +24,12 @@ interface Token {
     color: string;
     decimals: number;
     image?: string;
+    // Sepolia-specific fields
+    sepoliaToken?: SepoliaToken;
 }
 
 // Token list with CoinGecko IDs for real prices
-const SWAP_TOKENS: Token[] = [
+const MOCK_SWAP_TOKENS: Token[] = [
     { id: "ethereum", symbol: "ETH", name: "Ethereum", balance: "1.24", color: "#627EEA", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/eth.svg" },
     { id: "usd-coin", symbol: "USDC", name: "USD Coin", balance: "2,450.00", color: "#2775CA", decimals: 6, image: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png" },
     { id: "tether", symbol: "USDT", name: "Tether", balance: "500.00", color: "#26A17B", decimals: 6, image: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png" },
@@ -33,11 +42,32 @@ const SWAP_TOKENS: Token[] = [
     { id: "aave", symbol: "AAVE", name: "Aave", balance: "0.00", color: "#B6509E", decimals: 18, image: "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/aave.svg" },
 ];
 
-type SwapStep = "idle" | "confirming" | "signing" | "pending" | "success" | "error";
+// Build Sepolia token list from config
+function buildSepoliaTokenList(): Token[] {
+    return getSepoliaTokenList().map((st) => ({
+        id: st.coingeckoId,
+        symbol: st.symbol,
+        name: st.name,
+        balance: "0",
+        color: st.color,
+        decimals: st.decimals,
+        image: st.image,
+        sepoliaToken: st,
+    }));
+}
+
+const SEPOLIA_SWAP_TOKENS = buildSepoliaTokenList();
+
+type SwapStep = "idle" | "approving" | "approved" | "confirming" | "signing" | "pending" | "success" | "error";
 
 export default function SwapPage() {
     const { isConnected, address } = useAccount();
     const chainId = useChainId();
+    const isSepolia = chainId === 11155111;
+
+    // Select token list based on chain
+    const SWAP_TOKENS = isSepolia ? SEPOLIA_SWAP_TOKENS : MOCK_SWAP_TOKENS;
+
     const [sellAmount, setSellAmount] = useState("");
     const [sellToken, setSellToken] = useState<Token>(SWAP_TOKENS[0]); // ETH
     const [buyToken, setBuyToken] = useState<Token | null>(null);
@@ -46,34 +76,88 @@ export default function SwapPage() {
     const [slippage, setSlippage] = useState(0.5);
     const [showSettings, setShowSettings] = useState(false);
 
-    // Mock transaction hook for genuine wallet signing
+    // Update selected tokens when chain changes
+    useEffect(() => {
+        const tokens = isSepolia ? SEPOLIA_SWAP_TOKENS : MOCK_SWAP_TOKENS;
+        setSellToken(tokens[0]);
+        setBuyToken(null);
+        setSellAmount("");
+    }, [isSepolia]);
+
+    // ============ Mock Swap (non-Sepolia chains) ============
     const {
-        swap,
-        status: swapStatus,
-        txHash,
-        error: swapError,
-        reset: resetSwap,
-        isLoading: swapLoading,
-        isRejected
+        swap: mockSwap,
+        status: mockSwapStatus,
+        txHash: mockTxHash,
+        error: mockSwapError,
+        reset: resetMockSwap,
+        isLoading: mockSwapLoading,
+        isRejected: mockIsRejected
     } = useMockSwap({
         onSuccess: () => {
-            // Clear form on success
             setSellAmount("");
         }
     });
 
-    // Map status to swapStep for backward compatibility
-    const swapStep: SwapStep = swapStatus === "rejected" ? "error" : swapStatus;
-    const errorMessage = isRejected ? "Transaction cancelled by user" : swapError;
+    // ============ Real Swap (Sepolia) ============
+    const {
+        swap: realSwap,
+        status: realSwapStatus,
+        txHash: realTxHash,
+        error: realSwapError,
+        reset: resetRealSwap,
+        isLoading: realSwapLoading,
+        isRejected: realIsRejected,
+        explorerUrl,
+    } = useRealSwap({
+        onSuccess: () => {
+            setSellAmount("");
+            refetchSellBalance();
+            refetchBuyBalance();
+        }
+    });
 
-    // Fetch real prices
+    // ============ Real Token Balances (Sepolia) ============
+    const sellSepoliaToken = isSepolia ? sellToken.sepoliaToken ?? null : null;
+    const buySepoliaToken = isSepolia ? buyToken?.sepoliaToken ?? null : null;
+
+    const {
+        formatted: sellRealBalance,
+        refetch: refetchSellBalance,
+    } = useTokenBalance(sellSepoliaToken);
+
+    const {
+        formatted: buyRealBalance,
+        refetch: refetchBuyBalance,
+    } = useTokenBalance(buySepoliaToken);
+
+    // Use real balances on Sepolia, mock balances otherwise
+    const displaySellBalance = isSepolia
+        ? parseFloat(sellRealBalance).toFixed(sellToken.decimals > 8 ? 6 : 2)
+        : sellToken.balance;
+
+    const displayBuyBalance = isSepolia
+        ? (buyToken ? parseFloat(buyRealBalance).toFixed(buyToken.decimals > 8 ? 6 : 2) : "0")
+        : (buyToken?.balance || "0");
+
+    // ============ Unified Status ============
+    const swapStep: SwapStep = isSepolia
+        ? (realSwapStatus === "rejected" ? "error" : realSwapStatus as SwapStep)
+        : (mockSwapStatus === "rejected" ? "error" : mockSwapStatus as SwapStep);
+
+    const txHash = isSepolia ? realTxHash : mockTxHash;
+    const isRejected = isSepolia ? realIsRejected : mockIsRejected;
+    const errorMessage = isRejected
+        ? "Transaction cancelled by user"
+        : (isSepolia ? realSwapError : mockSwapError);
+
+    // ============ Price Data ============
     const { data: tokenPrices, isLoading: pricesLoading } = useTokenPrices();
     const { data: exchangeRate, isLoading: rateLoading, refetch: refetchRate } = useExchangeRate(
         sellToken.id,
         buyToken?.id || ""
     );
 
-    // Get real-time prices for tokens
     const getTokenPrice = (tokenId: string): number => {
         if (!tokenPrices) return 0;
         const token = tokenPrices.find(t => t.id === tokenId);
@@ -112,7 +196,7 @@ export default function SwapPage() {
         return SWAP_TOKENS.filter(
             t => t.symbol.toLowerCase().includes(query) || t.name.toLowerCase().includes(query)
         );
-    }, [searchQuery]);
+    }, [searchQuery, SWAP_TOKENS]);
 
     // Switch tokens (two-way swap)
     const handleSwitchTokens = () => {
@@ -141,22 +225,37 @@ export default function SwapPage() {
         setSearchQuery("");
     };
 
-    // Handle swap with genuine wallet signing
+    // Handle swap
     const handleSwap = async () => {
         if (!isConnected || !buyToken || !sellAmount || parseFloat(sellAmount) <= 0) return;
 
-        // Use mock swap hook which triggers real wallet signing
-        await swap({
-            fromToken: sellToken.symbol,
-            toToken: buyToken.symbol,
-            fromAmount: sellAmount,
-            toAmount: calculatedBuyAmount,
-        });
+        if (isSepolia && sellToken.sepoliaToken && buyToken.sepoliaToken) {
+            // Real swap on Sepolia via Uniswap V4
+            await realSwap({
+                fromToken: sellToken.sepoliaToken,
+                toToken: buyToken.sepoliaToken,
+                fromAmount: sellAmount,
+                toAmount: calculatedBuyAmount,
+                slippageBps: Math.round(slippage * 100), // Convert % to bps
+            });
+        } else {
+            // Mock swap for non-Sepolia chains
+            await mockSwap({
+                fromToken: sellToken.symbol,
+                toToken: buyToken.symbol,
+                fromAmount: sellAmount,
+                toAmount: calculatedBuyAmount,
+            });
+        }
     };
 
     // Reset transaction state
     const resetTransaction = () => {
-        resetSwap();
+        if (isSepolia) {
+            resetRealSwap();
+        } else {
+            resetMockSwap();
+        }
     };
 
     // Minimum received with slippage
@@ -165,6 +264,29 @@ export default function SwapPage() {
         const amount = parseFloat(calculatedBuyAmount) * (1 - slippage / 100);
         return amount.toFixed(6);
     }, [calculatedBuyAmount, slippage]);
+
+    // Explorer URL for transaction
+    const txExplorerUrl = useMemo(() => {
+        if (!txHash) return null;
+        if (isSepolia) return getSepoliaExplorerUrl(txHash);
+        return `https://arbiscan.io/tx/${txHash}`;
+    }, [txHash, isSepolia]);
+
+    // Set max balance
+    const handleSetMax = () => {
+        if (isSepolia) {
+            // For ETH, leave some for gas
+            const bal = parseFloat(sellRealBalance);
+            if (sellToken.sepoliaToken?.address === null) {
+                const maxBal = Math.max(0, bal - 0.01); // Leave 0.01 ETH for gas
+                setSellAmount(maxBal > 0 ? maxBal.toFixed(6) : "0");
+            } else {
+                setSellAmount(bal > 0 ? bal.toString() : "0");
+            }
+        } else {
+            setSellAmount(sellToken.balance.replace(/,/g, ''));
+        }
+    };
 
     return (
         <main className="min-h-screen pt-32 bg-background text-foreground flex flex-col items-center">
@@ -175,6 +297,26 @@ export default function SwapPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 className="w-full max-w-[480px] p-2"
             >
+                {/* Sepolia Testnet Banner */}
+                {isSepolia && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-3 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3"
+                    >
+                        <div className="flex items-center gap-2">
+                            <Wifi className="w-4 h-4 text-amber-500" />
+                            <Shield className="w-4 h-4 text-amber-500" />
+                        </div>
+                        <div>
+                            <div className="font-bold text-xs text-amber-500">Sepolia Testnet - Real Trades</div>
+                            <div className="text-[10px] text-amber-500/70">
+                                Swaps execute on Uniswap V4 via Sepolia. No real funds at risk.
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
                 <div className="bg-card border rounded-3xl p-4 shadow-xl">
                     <div className="flex items-center justify-between mb-4 px-2">
                         <nav className="flex items-center gap-4">
@@ -239,7 +381,7 @@ export default function SwapPage() {
                             <div className="flex justify-between mb-2">
                                 <span className="text-sm font-bold text-secondary-foreground">Sell</span>
                                 <button
-                                    onClick={() => setSellAmount(sellToken.balance.replace(/,/g, ''))}
+                                    onClick={handleSetMax}
                                     className="text-xs font-bold text-primary hover:underline"
                                 >
                                     MAX
@@ -274,7 +416,7 @@ export default function SwapPage() {
                                     )}
                                 </span>
                                 <span className="text-xs text-secondary-foreground">
-                                    Balance: {sellToken.balance} {sellToken.symbol}
+                                    Balance: {displaySellBalance} {sellToken.symbol}
                                 </span>
                             </div>
                         </div>
@@ -329,7 +471,7 @@ export default function SwapPage() {
                                     ${buyUsdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                                 </span>
                                 <span className="text-xs text-secondary-foreground">
-                                    Balance: {buyToken?.balance || '0'} {buyToken?.symbol || ''}
+                                    Balance: {displayBuyBalance} {buyToken?.symbol || ''}
                                 </span>
                             </div>
                         </div>
@@ -358,9 +500,29 @@ export default function SwapPage() {
                                 </span>
                             </div>
                             <div className="flex items-center justify-between text-xs">
-                                <span className="text-secondary-foreground">Network fee</span>
-                                <span className="font-mono">~$2.50</span>
+                                <span className="text-secondary-foreground">Network</span>
+                                <span className="font-mono flex items-center gap-1">
+                                    {isSepolia ? (
+                                        <>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                                            Sepolia (Testnet)
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" />
+                                            ~$2.50 fee
+                                        </>
+                                    )}
+                                </span>
                             </div>
+                                    {isSepolia && (
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-secondary-foreground">Router</span>
+                                    <span className="font-mono text-[10px]">
+                                        Uniswap V4 Universal Router
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -383,13 +545,25 @@ export default function SwapPage() {
                         >
                             Enter an amount
                         </button>
+                    ) : isSepolia && parseFloat(sellAmount) > parseFloat(sellRealBalance) ? (
+                        <button
+                            className="w-full mt-4 py-4 rounded-2xl bg-destructive/20 text-destructive font-bold text-lg cursor-not-allowed"
+                            disabled
+                        >
+                            Insufficient {sellToken.symbol} balance
+                        </button>
                     ) : (
                         <button
                             onClick={handleSwap}
                             disabled={swapStep !== "idle"}
-                            className="w-full mt-4 py-4 rounded-2xl bg-primary text-primary-foreground font-bold text-lg hover:opacity-90 transition-all disabled:opacity-50"
+                            className={`w-full mt-4 py-4 rounded-2xl font-bold text-lg transition-all disabled:opacity-50 ${isSepolia
+                                ? 'bg-amber-500 text-black hover:bg-amber-400'
+                                : 'bg-primary text-primary-foreground hover:opacity-90'
+                                }`}
                         >
-                            {swapStep === "idle" ? "Swap" : "Processing..."}
+                            {swapStep === "idle"
+                                ? (isSepolia ? "Swap on Sepolia" : "Swap")
+                                : "Processing..."}
                         </button>
                     )}
                 </div>
@@ -413,7 +587,11 @@ export default function SwapPage() {
 
                 {/* Data attribution */}
                 <div className="mt-4 text-center text-xs text-secondary-foreground">
-                    Live prices from CoinGecko • Refreshes every 15 seconds
+                    {isSepolia ? (
+                        <>Live prices from CoinGecko &bull; Swaps via Uniswap V4 on Sepolia</>
+                    ) : (
+                        <>Live prices from CoinGecko &bull; Refreshes every 15 seconds</>
+                    )}
                 </div>
             </motion.div>
 
@@ -445,6 +623,13 @@ export default function SwapPage() {
                                     ✕
                                 </button>
                             </div>
+
+                            {isSepolia && (
+                                <div className="mb-4 p-2 rounded-lg bg-amber-500/10 text-amber-500 text-[10px] font-bold text-center">
+                                    Sepolia Testnet Tokens - Real on-chain swaps
+                                </div>
+                            )}
+
                             <div className="relative mb-6">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-foreground" />
                                 <input
@@ -465,8 +650,6 @@ export default function SwapPage() {
                                     const isDisabled = tokenSelectMode === "sell"
                                         ? t.symbol === buyToken?.symbol
                                         : t.symbol === sellToken.symbol;
-
-                                    const tokenPrice = getTokenPrice(t.id);
 
                                     return (
                                         <button
@@ -523,6 +706,11 @@ export default function SwapPage() {
                                                                 ${tokenPrice.toLocaleString(undefined, { maximumFractionDigits: tokenPrice < 1 ? 4 : 2 })}
                                                             </span>
                                                         )}
+                                                        {isSepolia && token.sepoliaToken?.address && (
+                                                            <span className="text-[8px] text-secondary-foreground/30 font-mono">
+                                                                {token.sepoliaToken.address.slice(0, 6)}...{token.sepoliaToken.address.slice(-4)}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -538,7 +726,7 @@ export default function SwapPage() {
 
                                 {filteredTokens.length === 0 && (
                                     <div className="text-center py-8 text-secondary-foreground">
-                                        No tokens found for "{searchQuery}"
+                                        No tokens found for &quot;{searchQuery}&quot;
                                     </div>
                                 )}
                             </div>
@@ -563,23 +751,64 @@ export default function SwapPage() {
                             exit={{ opacity: 0, scale: 0.9 }}
                             className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[380px] bg-card border rounded-3xl p-8 z-[201] shadow-2xl"
                         >
+                            {/* Approving step (Sepolia only) */}
+                            {swapStep === "approving" && (
+                                <div className="text-center">
+                                    <Loader2 className="w-16 h-16 animate-spin text-amber-500 mx-auto mb-6" />
+                                    <h3 className="text-xl font-bold mb-2">Approve Token</h3>
+                                    <p className="text-secondary-foreground text-sm mb-6">
+                                        Approving {sellToken.symbol} for Uniswap V4 Router...
+                                    </p>
+                                    <p className="text-xs text-secondary-foreground">
+                                        Please confirm in your wallet
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Approved step (transitional, Sepolia only) */}
+                            {swapStep === "approved" && (
+                                <div className="text-center">
+                                    <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-6">
+                                        <CheckCircle className="w-8 h-8 text-success" />
+                                    </div>
+                                    <h3 className="text-xl font-bold mb-2">Token Approved</h3>
+                                    <p className="text-secondary-foreground text-sm mb-4">
+                                        Now executing swap...
+                                    </p>
+                                    <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto" />
+                                </div>
+                            )}
+
                             {swapStep === "confirming" && (
                                 <div className="text-center">
                                     <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto mb-6" />
-                                    <h3 className="text-xl font-bold mb-2">Confirm Swap</h3>
+                                    <h3 className="text-xl font-bold mb-2">
+                                        {isSepolia ? "Confirm Swap on Sepolia" : "Confirm Swap"}
+                                    </h3>
                                     <p className="text-secondary-foreground text-sm mb-6">
-                                        Swapping {sellAmount} {sellToken.symbol} for {calculatedBuyAmount} {buyToken?.symbol}
+                                        Swapping {sellAmount} {sellToken.symbol} for ~{calculatedBuyAmount} {buyToken?.symbol}
                                     </p>
                                     <div className="p-4 rounded-xl bg-secondary/20 text-sm">
                                         <div className="flex justify-between mb-2">
                                             <span className="text-secondary-foreground">Rate</span>
                                             <span className="font-mono">1 {sellToken.symbol} = {exchangeRate?.rate.toFixed(4)} {buyToken?.symbol}</span>
                                         </div>
-                                        <div className="flex justify-between">
+                                        <div className="flex justify-between mb-2">
                                             <span className="text-secondary-foreground">Min. received</span>
                                             <span className="font-mono">{minReceived} {buyToken?.symbol}</span>
                                         </div>
+                                        {isSepolia && (
+                                            <div className="flex justify-between">
+                                                <span className="text-secondary-foreground">Network</span>
+                                                <span className="font-mono text-amber-500">Sepolia Testnet</span>
+                                            </div>
+                                        )}
                                     </div>
+                                    {isSepolia && (
+                                        <p className="text-xs text-secondary-foreground mt-4">
+                                            Please confirm this transaction in your wallet
+                                        </p>
+                                    )}
                                 </div>
                             )}
 
@@ -600,16 +829,18 @@ export default function SwapPage() {
                                     <Loader2 className="w-16 h-16 animate-spin text-primary mx-auto mb-6" />
                                     <h3 className="text-xl font-bold mb-2">Transaction Pending</h3>
                                     <p className="text-secondary-foreground text-sm mb-4">
-                                        Waiting for blockchain confirmation...
+                                        {isSepolia
+                                            ? "Waiting for Sepolia confirmation..."
+                                            : "Waiting for blockchain confirmation..."}
                                     </p>
-                                    {txHash && (
+                                    {txHash && txExplorerUrl && (
                                         <a
-                                            href={`https://arbiscan.io/tx/${txHash}`}
+                                            href={txExplorerUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="inline-flex items-center gap-2 text-xs text-primary hover:underline"
                                         >
-                                            View on Explorer
+                                            View on {isSepolia ? "Sepolia Etherscan" : "Explorer"}
                                             <ExternalLink className="w-3 h-3" />
                                         </a>
                                     )}
@@ -622,23 +853,28 @@ export default function SwapPage() {
                                         <CheckCircle className="w-8 h-8 text-success" />
                                     </div>
                                     <h3 className="text-xl font-bold mb-2">Swap Successful!</h3>
-                                    <p className="text-secondary-foreground text-sm mb-6">
-                                        You received {calculatedBuyAmount} {buyToken?.symbol}
+                                    <p className="text-secondary-foreground text-sm mb-2">
+                                        You swapped {sellAmount || "~"} {sellToken.symbol} for ~{calculatedBuyAmount} {buyToken?.symbol}
                                     </p>
-                                    {txHash && (
+                                    {isSepolia && (
+                                        <p className="text-xs text-amber-500 mb-4">
+                                            Executed on Sepolia Testnet via Uniswap V4
+                                        </p>
+                                    )}
+                                    {txHash && txExplorerUrl && (
                                         <a
-                                            href={`https://arbiscan.io/tx/${txHash}`}
+                                            href={txExplorerUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="inline-flex items-center gap-2 text-xs text-primary hover:underline mb-6"
                                         >
-                                            View on Explorer
+                                            View on {isSepolia ? "Sepolia Etherscan" : "Explorer"}
                                             <ExternalLink className="w-3 h-3" />
                                         </a>
                                     )}
                                     <button
                                         onClick={resetTransaction}
-                                        className="w-full py-3 rounded-2xl bg-primary text-primary-foreground font-bold hover:opacity-90 transition-all"
+                                        className="w-full py-3 rounded-2xl bg-primary text-primary-foreground font-bold hover:opacity-90 transition-all mt-4"
                                     >
                                         Done
                                     </button>
@@ -651,9 +887,20 @@ export default function SwapPage() {
                                         <AlertCircle className="w-8 h-8 text-destructive" />
                                     </div>
                                     <h3 className="text-xl font-bold mb-2">Transaction Failed</h3>
-                                    <p className="text-secondary-foreground text-sm mb-6">
+                                    <p className="text-secondary-foreground text-sm mb-6 max-h-24 overflow-y-auto">
                                         {errorMessage || "Something went wrong. Please try again."}
                                     </p>
+                                    {isSepolia && !isRejected && (
+                                        <div className="p-3 rounded-xl bg-secondary/20 text-xs text-secondary-foreground mb-4">
+                                            <p className="font-bold mb-1">Common issues on Sepolia:</p>
+                                            <ul className="text-left space-y-1">
+                                                <li>&bull; No liquidity in pool for this pair</li>
+                                                <li>&bull; Insufficient Sepolia ETH for gas</li>
+                                                <li>&bull; Token not available on Sepolia</li>
+                                                <li>&bull; Try a different fee tier or pair</li>
+                                            </ul>
+                                        </div>
+                                    )}
                                     <button
                                         onClick={resetTransaction}
                                         className="w-full py-3 rounded-2xl bg-secondary/50 font-bold hover:bg-secondary transition-all"

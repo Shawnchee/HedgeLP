@@ -2,12 +2,14 @@
 
 import { Header } from "@/components/header";
 import { PoolDepositModal, type PoolDepositSettings } from "@/components/pool-deposit-modal";
+import type { DepositResult } from "@/hooks/use-pool-deposit";
 import {
     Search, Star, ArrowUpRight, RefreshCw, Loader2,
-    TrendingUp, ArrowDownUp, ChevronDown, ChevronRight,
+    TrendingUp, ArrowDownUp, ChevronDown, ChevronRight, Wifi, Zap,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useMemo, useCallback } from "react";
+import { useChainId } from "wagmi";
 import {
     useTopPools, useRewardPools, usePoolStats,
     formatTvl, formatApy, getTokenIconFromSymbol,
@@ -16,6 +18,7 @@ import {
 import { usePositions, type VaultPosition } from "@/hooks/use-positions";
 
 type SortOption = "apy-desc" | "apy-asc" | "tvl-desc" | "tvl-asc";
+type VersionFilter = "all" | "v2" | "v3" | "v4";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
     { value: "apy-desc", label: "Highest APY" },
@@ -24,10 +27,21 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
     { value: "tvl-asc", label: "Lowest TVL" },
 ];
 
+const VERSION_FILTERS: { value: VersionFilter; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "v2", label: "V2" },
+    { value: "v3", label: "V3" },
+    { value: "v4", label: "V4" },
+];
+
 export default function PoolsPage() {
+    const chainId = useChainId();
+    const isSepolia = chainId === 11155111;
+
     const [searchQuery, setSearchQuery] = useState("");
     const [sortBy, setSortBy] = useState<SortOption>("apy-desc");
     const [showSortMenu, setShowSortMenu] = useState(false);
+    const [versionFilter, setVersionFilter] = useState<VersionFilter>("all");
     const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
     const [showDepositModal, setShowDepositModal] = useState(false);
 
@@ -41,15 +55,36 @@ export default function PoolsPage() {
         setShowDepositModal(true);
     }, []);
 
-    const handleDepositSuccess = useCallback((pool: Pool, amount: number, settings: PoolDepositSettings) => {
+    const handleDepositSuccess = useCallback((pool: Pool, amount: number, settings: PoolDepositSettings, result?: DepositResult, ethPrice?: number) => {
         const icons = getTokenIconFromSymbol(pool.symbol);
+        const isReal = !!result;
+        const ep = ethPrice ?? 0;
+
+        // Calculate real USD values for on-chain deposits
+        const depositedUsd = isReal
+            ? parseFloat(result.totalEthDeposited) * ep
+            : amount;
+        const lpValueUsd = isReal
+            ? parseFloat(result.lpEthAmount) * ep
+            : amount * settings.lpPercent / 100;
+        const hedgeValueUsd = isReal
+            ? (parseFloat(result.hedgeUsdcFormatted) > 0
+                ? parseFloat(result.hedgeUsdcFormatted)       // USDC = 1:1 USD
+                : parseFloat(result.hedgeEthAmount) * ep)
+            : amount * (100 - settings.lpPercent) / 100;
+
+        // Estimate LP USDC received (from LP swap half)
+        const totalUsdc = parseFloat(result?.totalUsdcReceived ?? "0");
+        const hedgeUsdc = parseFloat(result?.hedgeUsdcFormatted ?? "0");
+        const lpUsdcReceived = Math.max(0, totalUsdc - hedgeUsdc);
+
         const newPos: VaultPosition = {
             id: `pos-${Date.now()}`,
             pool: pool.name,
-            protocol: pool.version || "Uniswap V3",
-            chain: pool.chain,
-            deposited: amount,
-            currentValue: amount,
+            protocol: pool.version || "Uniswap V4",
+            chain: isReal ? "Sepolia" : pool.chain,
+            deposited: depositedUsd,
+            currentValue: depositedUsd,
             pnl: 0,
             pnlPercent: 0,
             lpPercent: settings.lpPercent,
@@ -63,6 +98,27 @@ export default function PoolsPage() {
             icon2: icons.token2Icon,
             color1: pool.color1,
             color2: pool.color2,
+
+            // Real on-chain data (single multicall tx)
+            isReal,
+            network: isReal ? "Sepolia" : undefined,
+            totalEthDeposited: result?.totalEthDeposited,
+            lpEthAmount: result?.lpEthAmount,
+            lpWethKept: result?.lpWethKept,
+            lpUsdcReceived: lpUsdcReceived > 0 ? lpUsdcReceived.toFixed(2) : undefined,
+            hedgeEthAmount: result?.hedgeEthAmount,
+            hedgeUsdcReceived: result?.hedgeUsdcFormatted,
+            totalUsdcReceived: result?.totalUsdcReceived,
+            txHash: result?.txHash,
+            ethPriceAtDeposit: ep > 0 ? ep : undefined,
+            lpValueUsd,
+            hedgeValueUsd,
+            depositedUsd,
+
+            // 1x Short / Delta-Neutral
+            shortSizeEth: result?.shortSizeEth,
+            lpEthExposure: result?.lpEthExposure,
+            hedgeCoverage: result?.hedgeCoverage,
         };
         addPosition(newPos);
     }, [addPosition]);
@@ -71,6 +127,11 @@ export default function PoolsPage() {
     const filteredPools = useMemo(() => {
         if (!topPools) return [];
         let pools = [...topPools];
+
+        // Version filter
+        if (versionFilter !== "all") {
+            pools = pools.filter(pool => pool.version === versionFilter);
+        }
 
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
@@ -92,13 +153,33 @@ export default function PoolsPage() {
         });
 
         return pools;
-    }, [topPools, searchQuery, sortBy]);
+    }, [topPools, searchQuery, sortBy, versionFilter]);
 
     return (
         <main className="min-h-screen pt-16 bg-background text-foreground">
             <Header />
 
             <div className="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+                {/* Sepolia Banner */}
+                {isSepolia && (
+                    <div className="lg:col-span-12">
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-success/10 to-primary/10 border border-success/30"
+                        >
+                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-success/20 border border-success/30">
+                                <Wifi className="w-4 h-4 text-success" />
+                                <span className="text-sm font-bold text-success">Sepolia Testnet</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-foreground/80">
+                                <Zap className="w-4 h-4 text-primary" />
+                                <span>Real on-chain pool deposits &bull; Click any pool to add liquidity via Uniswap V4</span>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
 
                 {/* Left Column: Stats + Top Pools */}
                 <div className="lg:col-span-8 space-y-8">
@@ -138,6 +219,22 @@ export default function PoolsPage() {
                                 >
                                     {isFetching ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <RefreshCw className="w-4 h-4 text-secondary-foreground" />}
                                 </button>
+                                {/* Version Filter */}
+                                <div className="flex items-center rounded-xl bg-secondary/20 p-0.5">
+                                    {VERSION_FILTERS.map((filter) => (
+                                        <button
+                                            key={filter.value}
+                                            onClick={() => setVersionFilter(filter.value)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                versionFilter === filter.value
+                                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                                    : "text-secondary-foreground hover:text-foreground hover:bg-secondary/50"
+                                            }`}
+                                        >
+                                            {filter.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 {/* Sort Dropdown */}
@@ -205,7 +302,11 @@ export default function PoolsPage() {
                                 </div>
                             ) : filteredPools.length === 0 ? (
                                 <div className="p-12 text-center text-secondary-foreground">
-                                    {searchQuery ? `No pools found for "${searchQuery}"` : "No pools available"}
+                                    {searchQuery
+                                        ? `No pools found for "${searchQuery}"${versionFilter !== "all" ? ` in ${versionFilter.toUpperCase()}` : ""}`
+                                        : versionFilter !== "all"
+                                            ? `No ${versionFilter.toUpperCase()} pools available`
+                                            : "No pools available"}
                                 </div>
                             ) : (
                                 <div className="divide-y">

@@ -217,7 +217,7 @@ export function WalletButton() {
                                 </div>
                                 {balance && (
                                     <div className="text-sm text-secondary-foreground mt-2">
-                                        Balance: {parseFloat(balance.formatted).toFixed(4)} {balance.symbol}
+                                        Balance: {(Number(balance.value) / 10 ** balance.decimals).toFixed(4)} {balance.symbol}
                                     </div>
                                 )}
                             </div>

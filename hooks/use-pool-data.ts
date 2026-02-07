@@ -42,6 +42,7 @@ const TOKEN_COLORS: Record<string, string> = {
     WETH: "#627EEA",
     USDC: "#2775CA",
     USDT: "#26A17B",
+    "USD₮": "#26A17B",
     DAI: "#F5AC37",
     WBTC: "#F7931A",
     UNI: "#FF007A",
@@ -53,6 +54,12 @@ const TOKEN_COLORS: Record<string, string> = {
     USDE: "#565D6D",
     CRV: "#FF5F00",
     MKR: "#1AAB9B",
+    MSUSD: "#1E90FF",
+    MSY: "#7B61FF",
+    YNRWAX: "#D4A843",
+    YNUSDX: "#4A90D9",
+    IQ: "#5AC8FA",
+    FRXUSD: "#000000",
 };
 
 function getTokenColor(symbol: string): string {
@@ -73,6 +80,7 @@ export function getTokenIconFromSymbol(poolSymbol: string): { token1Icon: string
             "WETH": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/eth.svg",
             "USDC": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
             "USDT": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
+            "USD₮": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xdAC17F958D2ee523a2206206994597C13D831ec7/logo.png",
             "DAI": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/dai.svg",
             "WBTC": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/btc.svg",
             "UNI": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/uni.svg",
@@ -86,6 +94,12 @@ export function getTokenIconFromSymbol(poolSymbol: string): { token1Icon: string
             "USDE": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
             "CRV": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/crv.svg",
             "MKR": "https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/svg/color/mkr.svg",
+            "MSUSD": "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48/logo.png",
+            "MSY": "https://assets.coingecko.com/coins/images/34783/standard/MSY.png",
+            "YNRWAX": "https://assets.coingecko.com/coins/images/44453/standard/ynRWAx.png",
+            "YNUSDX": "https://assets.coingecko.com/coins/images/44454/standard/ynUSDx.png",
+            "IQ": "https://assets.coingecko.com/coins/images/5010/standard/IQ.png",
+            "FRXUSD": "https://assets.coingecko.com/coins/images/39987/standard/frxUSD.png",
         };
         const color = getTokenColor(symbol);
         return TOKEN_ICONS[symbol] || `https://via.placeholder.com/40/${color.slice(1)}/ffffff?text=${symbol}`;
@@ -325,11 +339,11 @@ function transformPool(pool: any): Pool {
 
 function getFallbackPools(): Pool[] {
     return [
-        { id: "eth-usdc-1", name: "ETH / USDC", symbol: "ETH-USDC", chain: "Ethereum", project: "Uniswap V3", tvlUsd: 120400000, apyBase: 7.55, apyReward: 0, apy: 7.55, rewardTokens: [], pool: "eth-usdc-1", underlyingTokens: [], color1: "#627EEA", color2: "#2775CA", version: "v3", fee: "0.05%" },
-        { id: "wbtc-eth-1", name: "WBTC / ETH", symbol: "WBTC-ETH", chain: "Ethereum", project: "Uniswap V3", tvlUsd: 82100000, apyBase: 11.52, apyReward: 0, apy: 11.52, rewardTokens: [], pool: "wbtc-eth-1", underlyingTokens: [], color1: "#F7931A", color2: "#627EEA", version: "v3", fee: "0.3%" },
-        { id: "eth-usdt-1", name: "ETH / USDT", symbol: "ETH-USDT", chain: "Ethereum", project: "Uniswap V3", tvlUsd: 45200000, apyBase: 38.69, apyReward: 0, apy: 38.69, rewardTokens: [], pool: "eth-usdt-1", underlyingTokens: [], color1: "#627EEA", color2: "#26A17B", version: "v3", fee: "0.3%" },
-        { id: "usdc-usdt-1", name: "USDC / USDT", symbol: "USDC-USDT", chain: "Ethereum", project: "Uniswap V3", tvlUsd: 65000000, apyBase: 3.21, apyReward: 0, apy: 3.21, rewardTokens: [], pool: "usdc-usdt-1", underlyingTokens: [], color1: "#2775CA", color2: "#26A17B", version: "v3", fee: "0.01%" },
-        { id: "arb-eth-1", name: "ARB / ETH", symbol: "ARB-ETH", chain: "Arbitrum", project: "Uniswap V3", tvlUsd: 28500000, apyBase: 15.32, apyReward: 2.5, apy: 17.82, rewardTokens: ["ARB"], pool: "arb-eth-1", underlyingTokens: [], color1: "#28A0F0", color2: "#627EEA", version: "v3", fee: "0.3%" },
+        { id: "eth-usdc-1", name: "ETH / USDC", symbol: "ETH-USDC", chain: "Ethereum", project: "Uniswap V4", tvlUsd: 120400000, apyBase: 7.55, apyReward: 0, apy: 7.55, rewardTokens: [], pool: "eth-usdc-1", underlyingTokens: [], color1: "#627EEA", color2: "#2775CA", version: "v3", fee: "0.05%" },
+        { id: "wbtc-eth-1", name: "WBTC / ETH", symbol: "WBTC-ETH", chain: "Ethereum", project: "Uniswap V4", tvlUsd: 82100000, apyBase: 11.52, apyReward: 0, apy: 11.52, rewardTokens: [], pool: "wbtc-eth-1", underlyingTokens: [], color1: "#F7931A", color2: "#627EEA", version: "v3", fee: "0.3%" },
+        { id: "eth-usdt-1", name: "ETH / USDT", symbol: "ETH-USDT", chain: "Ethereum", project: "Uniswap V4", tvlUsd: 45200000, apyBase: 38.69, apyReward: 0, apy: 38.69, rewardTokens: [], pool: "eth-usdt-1", underlyingTokens: [], color1: "#627EEA", color2: "#26A17B", version: "v3", fee: "0.3%" },
+        { id: "usdc-usdt-1", name: "USDC / USDT", symbol: "USDC-USDT", chain: "Ethereum", project: "Uniswap V4", tvlUsd: 65000000, apyBase: 3.21, apyReward: 0, apy: 3.21, rewardTokens: [], pool: "usdc-usdt-1", underlyingTokens: [], color1: "#2775CA", color2: "#26A17B", version: "v3", fee: "0.01%" },
+        { id: "arb-eth-1", name: "ARB / ETH", symbol: "ARB-ETH", chain: "Arbitrum", project: "Uniswap V4", tvlUsd: 28500000, apyBase: 15.32, apyReward: 2.5, apy: 17.82, rewardTokens: ["ARB"], pool: "arb-eth-1", underlyingTokens: [], color1: "#28A0F0", color2: "#627EEA", version: "v3", fee: "0.3%" },
     ];
 }
 

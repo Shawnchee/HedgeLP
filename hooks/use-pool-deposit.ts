@@ -309,6 +309,7 @@ export function usePoolDeposit(options?: UsePoolDepositOptions) {
           functionName: "execute",
           args: [commands, [v4SwapInput], deadline],
           value: totalSwapAmount, // Only send ETH that needs to be swapped
+          gas: BigInt(800_000), // Explicit cap: batched V4 swaps (LP + hedge)
         });
 
         setTxHash(hash);

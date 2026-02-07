@@ -6,22 +6,27 @@ import type { VaultPosition } from "./use-positions";
 /**
  * Real-time PnL breakdown for a single HedgeLP position.
  *
- * Calculations:
+ * IMPORTANT: All USD values are computed using CoinGecko ETH prices (real-world),
+ * NOT raw USDC amounts from Sepolia testnet swaps. Testnet pool prices can differ
+ * wildly from real-world prices, so using raw USDC would show fake profits/losses.
+ *
+ * Calculations (CoinGecko-price-based):
  *
  * LP side:
- *   - Holds lpWethKept ETH + lpUsdcReceived USDC
- *   - LP value now = lpWethKept * currentPrice + lpUsdc
- *   - LP value at entry = lpWethKept * entryPrice + lpUsdc
- *   - LP PnL (from price) = lpWethKept * (currentPrice - entryPrice)
+ *   - Holds lpWethKept ETH + lpSwapEth swapped to USDC
+ *   - LP value now  = lpWethKept * currentPrice + lpSwapEth * entryPrice
+ *   - LP value entry = lpWethKept * entryPrice   + lpSwapEth * entryPrice
+ *   - LP PnL = lpWethKept * (currentPrice - entryPrice)
  *
  * Hedge (1x Short) side:
- *   - Sold hedgeEthAmount ETH for hedgeUsdc at entry
- *   - To close: buy back hedgeEthAmount ETH at current price
- *   - Short PnL = hedgeUsdc - hedgeEthAmount * currentPrice
+ *   - Sold hedgeEthAmount ETH at entryPrice (CoinGecko)
+ *   - Short entry notional = hedgeEthAmount * entryPrice
+ *   - Short PnL = hedgeEthAmount * (entryPrice - currentPrice)
  *   - If ETH drops → profit, if ETH rises → loss
  *
  * Net (delta-neutral):
- *   - Net PnL ≈ 0 from price movement (if well-hedged)
+ *   - Net PnL = (lpWethKept - hedgeEthAmount) * (currentPrice - entryPrice)
+ *   - ≈ 0 when well-hedged (lpWethKept ≈ hedgeEthAmount)
  *   - Real PnL comes from LP fees earned
  */
 export interface PositionPnL {
@@ -99,29 +104,41 @@ export function computePositionPnL(
 
     const entryPrice = pos.ethPriceAtDeposit!;
     const lpWethKept = parseFloat(pos.lpWethKept || pos.lpEthExposure || "0");
-    const lpUsdc = parseFloat(pos.lpUsdcReceived || "0");
+    const lpEthAmount = parseFloat(pos.lpEthAmount || "0");
     const hedgeEthAmount = parseFloat(pos.hedgeEthAmount || pos.shortSizeEth || "0");
-    const hedgeUsdc = parseFloat(pos.hedgeUsdcReceived || "0");
 
-    // If lpUsdcReceived not stored, estimate from totalUsdcReceived - hedgeUsdcReceived
-    const totalUsdc = parseFloat(pos.totalUsdcReceived || "0");
-    const effectiveLpUsdc = lpUsdc > 0 ? lpUsdc : Math.max(0, totalUsdc - hedgeUsdc);
+    // ================================================================
+    // IMPORTANT: We do NOT use raw USDC amounts from testnet swaps
+    // (hedgeUsdcReceived, lpUsdcReceived, totalUsdcReceived) because
+    // the Sepolia pool price can differ wildly from the real-world
+    // CoinGecko ETH price. Instead, we compute all USD values from
+    // ETH amounts × CoinGecko prices for consistency.
+    // ================================================================
 
-    // LP value now: WETH at current price + USDC (stable)
-    const lpValueNow = lpWethKept * currentEthPrice + effectiveLpUsdc;
+    // LP: the USDC side was obtained by swapping (lpEthAmount - lpWethKept) ETH.
+    // We value it at the CoinGecko entry price (stable, doesn't change with ETH price).
+    const lpSwapEth = lpEthAmount > 0
+        ? Math.max(0, lpEthAmount - lpWethKept)
+        : lpWethKept; // fallback: assume 50/50 split
+    const lpUsdcAtEntry = lpSwapEth * entryPrice;
 
-    // Short: user holds hedgeUsdc USDC, "owes" hedgeEthAmount ETH at current price
-    // Short value = hedgeUsdc (what they hold) — the "liability" is hedgeEthAmount * currentPrice
-    // But for display, hedge value = the USDC they actually hold
-    const hedgeValueNow = hedgeUsdc; // USDC doesn't change in USD terms
+    // LP value now: WETH side at current price + USDC side at entry value (stable)
+    const lpValueNow = lpWethKept * currentEthPrice + lpUsdcAtEntry;
 
-    // LP PnL from price movement (WETH side only; USDC is stable)
+    // Hedge (1x Short): entry notional = hedgeEthAmount × CoinGecko entry price.
+    // The USDC held from the short doesn't change in USD terms.
+    const hedgeEntryNotional = hedgeEthAmount * entryPrice;
+    const hedgeValueNow = hedgeEntryNotional;
+
+    // LP PnL: only the WETH side moves with price (USDC side is stable)
     const lpPnl = lpWethKept * (currentEthPrice - entryPrice);
 
-    // Short PnL: gained hedgeUsdc by selling ETH at entry; to close need hedgeEthAmount * current
-    const shortPnl = hedgeUsdc - hedgeEthAmount * currentEthPrice;
+    // Short PnL: profit/loss from 1x short since entry
+    // If ETH rises → loss (you sold low), if ETH falls → profit (you sold high)
+    const shortPnl = hedgeEthAmount * (entryPrice - currentEthPrice);
 
-    // Net PnL from price movement (should be ~0 if well-hedged)
+    // Net PnL = (lpWethKept - hedgeEthAmount) × (currentPrice - entryPrice)
+    // ≈ 0 when well-hedged (lpWethKept ≈ hedgeEthAmount)
     const netPnl = lpPnl + shortPnl;
 
     const depositedUsd = pos.depositedUsd || parseFloat(pos.totalEthDeposited || "0") * entryPrice;

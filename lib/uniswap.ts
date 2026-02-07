@@ -142,21 +142,34 @@ export const UR_COMMANDS = {
 // Source: https://github.com/Uniswap/v4-periphery/blob/main/src/libraries/Actions.sol
 // ============================================================
 export const V4_ACTIONS = {
+  // Liquidity actions
+  INCREASE_LIQUIDITY: 0x00,
+  DECREASE_LIQUIDITY: 0x01,
+  MINT_POSITION: 0x02,
+  BURN_POSITION: 0x03,
+  INCREASE_LIQUIDITY_FROM_DELTAS: 0x04,
+  MINT_POSITION_FROM_DELTAS: 0x05,
   // Swap actions
-  SWAP_EXACT_IN_SINGLE: 0x04,
-  SWAP_EXACT_IN: 0x05,
-  SWAP_EXACT_OUT_SINGLE: 0x06,
-  SWAP_EXACT_OUT: 0x07,
+  SWAP_EXACT_IN_SINGLE: 0x06,
+  SWAP_EXACT_IN: 0x07,
+  SWAP_EXACT_OUT_SINGLE: 0x08,
+  SWAP_EXACT_OUT: 0x09,
+  // Donate
+  DONATE: 0x0a,
   // Settlement actions
-  SETTLE: 0x09,
-  SETTLE_ALL: 0x10,
-  SETTLE_PAIR: 0x11,
-  TAKE: 0x12,
-  TAKE_ALL: 0x13,
-  TAKE_PAIR: 0x14,
-  TAKE_PORTION: 0x15,
-  CLOSE_CURRENCY: 0x16,
-  SWEEP: 0x17,
+  SETTLE: 0x0b,
+  SETTLE_ALL: 0x0c,
+  SETTLE_PAIR: 0x0d,
+  TAKE: 0x0e,
+  TAKE_ALL: 0x0f,
+  TAKE_PORTION: 0x10,
+  TAKE_PAIR: 0x11,
+  CLOSE_CURRENCY: 0x12,
+  CLEAR_OR_TAKE: 0x13,
+  SWEEP: 0x14,
+  // Wrapping
+  WRAP: 0x15,
+  UNWRAP: 0x16,
 } as const;
 
 // ============================================================

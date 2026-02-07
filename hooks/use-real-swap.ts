@@ -380,6 +380,7 @@ export function useRealSwap(options?: UseRealSwapOptions) {
         functionName: "execute",
         args: [commands, [v4SwapInput], deadline],
         value: isFromETH ? amountIn : BigInt(0),
+        gas: BigInt(600_000), // Explicit cap: single V4 swap
       });
 
       setStatus("pending");

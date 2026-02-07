@@ -440,7 +440,7 @@ export default function DashboardPage() {
                                                             {pnl.shortPnl >= 0 ? "+" : ""}${pnl.shortPnl.toFixed(2)}
                                                         </div>
                                                         <div className="text-[9px] text-secondary-foreground font-mono">{pnl.shortSizeEth.toFixed(4)} ETH short</div>
-                                                        <div className="text-[9px] text-secondary-foreground font-mono">${pnl.hedgeValueNow.toFixed(2)} USDC</div>
+                                                        <div className="text-[9px] text-secondary-foreground font-mono">${pnl.hedgeValueNow.toFixed(2)} notional</div>
                                                     </div>
                                                     <div className="p-2 rounded-lg bg-secondary/10">
                                                         <div className="text-[9px] text-secondary-foreground uppercase font-bold tracking-wider">Net P&L</div>

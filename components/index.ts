@@ -8,4 +8,4 @@ export { CompoundingChart } from "./compounding-chart";
 export { TradePreviewModal } from "./trade-preview-modal";
 export type { TradeSettings } from "./trade-preview-modal";
 export { PoolDepositModal } from "./pool-deposit-modal";
-export { PositionModals } from "./position-modals";
+export { ManagePositionModal, ClosePositionModal } from "./position-modals";

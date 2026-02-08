@@ -77,7 +77,7 @@ We welcome feature suggestions! Please:
 
 ```bash
 # Clone your fork
-git clone https://github.com/Shawnchee/HedgeLP.git
+git clone https://github.com/<your-username>/HedgeLP.git
 cd HedgeLP
 
 # Install dependencies
@@ -123,7 +123,7 @@ export default function MyComponent() { ... }
 
 ### Solidity
 
-- Follow the [Solidity Style Guide](https://docs.soliditylang.org/en/v0.8.24/style-guide.html).
+- Follow the [Solidity Style Guide](https://docs.soliditylang.org/en/v0.8.26/style-guide.html).
 - Use NatSpec comments for all public functions.
 - Prefer explicit types over `var`.
 

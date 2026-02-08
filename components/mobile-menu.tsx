@@ -8,14 +8,7 @@ import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
 import { WalletButton } from "./wallet-button";
 import { ThemeToggle } from "./theme-toggle";
-
-const NAV_ITEMS = [
-    { name: "Swap", href: "/swap" },
-    { name: "Tokens", href: "/tokens" },
-    { name: "Pools", href: "/pools" },
-    { name: "Vault", href: "/dashboard" },
-    { name: "Calculator", href: "/calculator" },
-];
+import { NAV_ITEMS } from "@/lib/constants";
 
 export function MobileMenu() {
     const [isOpen, setIsOpen] = useState(false);
@@ -49,7 +42,7 @@ export function MobileMenu() {
                             animate={{ x: 0 }}
                             exit={{ x: "100%" }}
                             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                            className="fixed top-0 right-0 bottom-0 w-[300px] bg-card border-l z-[101] lg:hidden flex flex-col"
+                            className="fixed top-0 right-0 bottom-0 w-[300px] z-[101] lg:hidden flex flex-col border-l bg-white dark:bg-black shadow-2xl"
                         >
                             {/* Header */}
                             <div className="flex justify-between items-center p-6 border-b">

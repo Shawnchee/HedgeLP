@@ -28,12 +28,33 @@ export const CONTRACTS = {
 
 export type SupportedChainId = keyof typeof CONTRACTS;
 
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
 export function getContracts(chainId: number) {
     const contracts = CONTRACTS[chainId as SupportedChainId];
     if (!contracts) {
         throw new Error(`Unsupported chain: ${chainId}`);
     }
     return contracts;
+}
+
+/**
+ * Get a specific contract address with zero-address guard.
+ * Throws if the address is the zero address on a non-local chain.
+ */
+export function getContractAddress(
+    chainId: number,
+    contract: keyof (typeof CONTRACTS)[SupportedChainId]
+): string {
+    const contracts = getContracts(chainId);
+    const address = contracts[contract];
+    if (address === ZERO_ADDRESS && chainId !== 31337) {
+        throw new Error(
+            `Contract "${contract}" is not deployed on chain ${chainId}. ` +
+            `Refusing to use the zero address.`
+        );
+    }
+    return address;
 }
 
 // Simplified ABI for vault (key functions only)

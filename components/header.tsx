@@ -7,14 +7,7 @@ import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "clsx";
-
-const NAV_ITEMS = [
-    { name: "Swap", href: "/swap" },
-    { name: "Tokens", href: "/tokens" },
-    { name: "Pools", href: "/pools" },
-    { name: "Vault", href: "/dashboard" },
-    { name: "Calculator", href: "/calculator" },
-];
+import { NAV_ITEMS } from "@/lib/constants";
 
 export function Header() {
     const pathname = usePathname();

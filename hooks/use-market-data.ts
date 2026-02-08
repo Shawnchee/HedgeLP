@@ -28,8 +28,11 @@ export function getTokenIcon(symbol: string): string {
     if (token) {
         return token.image;
     }
-    // Fallback placeholder with default color
-    return `https://via.placeholder.com/40/627EEA/ffffff?text=${normalizedSymbol}`;
+    // Local SVG fallback — avoids reliance on external placeholder services
+    const letter = normalizedSymbol.charAt(0) || "?";
+    return `data:image/svg+xml,${encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" rx="20" fill="%23627EEA"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" fill="white" font-family="sans-serif" font-size="16" font-weight="bold">${letter}</text></svg>`
+    )}`;
 }
 
 // ============ Types ============

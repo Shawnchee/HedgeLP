@@ -7,8 +7,16 @@ import { WagmiProvider, createConfig, http } from "wagmi";
 import { mainnet, sepolia, arbitrum, base, foundry } from "wagmi/chains";
 import { injected, walletConnect, coinbaseWallet } from "wagmi/connectors";
 
-// WalletConnect Project ID - get from cloud.walletconnect.com
-const WALLETCONNECT_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo";
+// WalletConnect Project ID — get one from cloud.walletconnect.com
+const WALLETCONNECT_PROJECT_ID =
+    process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";
+
+if (!WALLETCONNECT_PROJECT_ID && typeof window !== "undefined") {
+    console.warn(
+        "[HedgeLP] NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not set. " +
+        "WalletConnect will not work. Get a project ID from cloud.walletconnect.com"
+    );
+}
 
 const config = createConfig({
     chains: [sepolia, arbitrum, base, mainnet, foundry],

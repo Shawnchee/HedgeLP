@@ -188,6 +188,31 @@ User clicks "Swap" on /swap
 
 ---
 
+## ⚡ Performance
+
+<div align="center">
+  <a href="https://pagespeed.web.dev/analysis/https-hedge-lp-ethglobal-vercel-app/q0y6utkd3o?form_factor=mobile">
+    <img src="public/hedgelp-lighthouse-perf.png" alt="Lighthouse Performance" width="600" />
+  </a>
+</div>
+
+**Lighthouse Scores:**
+- **Performance**: 100/100
+- **Accessibility**: 95/100
+- **Best Practices**: 100/100
+- **SEO**: 100/100
+
+**Core Web Vitals:**
+- First Contentful Paint: **0.2s**
+- Largest Contentful Paint: **0.5s**
+- Total Blocking Time: **0ms**
+- Cumulative Layout Shift: **0**
+- Speed Index: **0.3s**
+
+> 🚀 Built with Next.js 16, React 19, and optimized for production deployment on Vercel.
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites

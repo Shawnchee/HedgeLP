@@ -24,6 +24,7 @@ import {
   DEFAULT_FEE,
   getSepoliaExplorerUrl,
 } from "@/lib/uniswap";
+import { FINANCIAL_DEFAULTS } from "@/lib/constants";
 
 // ============ Types ============
 
@@ -108,6 +109,21 @@ export function usePoolDeposit(options?: UsePoolDepositOptions) {
   }
 
   /**
+   * Apply slippage tolerance to a swap amount to derive a minimum output.
+   * Uses a simplified amountIn-based floor (conservative for same-pair swaps).
+   * @param amountIn   The exact input amount (in wei)
+   * @param slippageBps  Slippage tolerance in basis points (e.g. 50 = 0.5%)
+   * @returns Minimum acceptable output (amountIn minus slippage %)
+   */
+  function applySlippage(amountIn: bigint, slippageBps: number): bigint {
+    if (slippageBps <= 0 || slippageBps > FINANCIAL_DEFAULTS.MAX_SLIPPAGE_BPS) {
+      slippageBps = FINANCIAL_DEFAULTS.DEFAULT_SLIPPAGE_BPS;
+    }
+    // minOut = amountIn * (10000 - slippageBps) / 10000
+    return (amountIn * BigInt(10000 - slippageBps)) / BigInt(10000);
+  }
+
+  /**
    * Execute a HedgeLP deposit via Uniswap V4 Universal Router.
    *
    * How it works (V4):
@@ -126,7 +142,7 @@ export function usePoolDeposit(options?: UsePoolDepositOptions) {
    *   1x short on ETH of that size. This offsets the LP's ETH exposure.
    */
   const deposit = useCallback(
-    async (ethAmount: string, lpPercent: number) => {
+    async (ethAmount: string, lpPercent: number, slippageBps: number = FINANCIAL_DEFAULTS.DEFAULT_SLIPPAGE_BPS) => {
       if (!address || !isSepolia || !publicClient) {
         setError("Connect wallet to Sepolia");
         setStatus("error");
@@ -208,7 +224,7 @@ export function usePoolDeposit(options?: UsePoolDepositOptions) {
                 },
                 zeroForOne: true,
                 amountIn: lpSwapAmount,
-                amountOutMinimum: BigInt(0), // Testnet: no slippage protection
+                amountOutMinimum: applySlippage(lpSwapAmount, slippageBps),
                 hookData: "0x" as `0x${string}`,
               },
             ])
@@ -227,7 +243,7 @@ export function usePoolDeposit(options?: UsePoolDepositOptions) {
                 },
                 zeroForOne: true,
                 amountIn: hedgeAmount,
-                amountOutMinimum: BigInt(0),
+                amountOutMinimum: applySlippage(hedgeAmount, slippageBps),
                 hookData: "0x" as `0x${string}`,
               },
             ])
@@ -245,7 +261,7 @@ export function usePoolDeposit(options?: UsePoolDepositOptions) {
           params.push(
             encodeAbiParameters(CURRENCY_AMOUNT_TYPE, [
               usdcAddress,
-              BigInt(0), // minimum: 0 for testnet
+              applySlippage(totalSwapAmount, slippageBps),
             ])
           );
         } else {
@@ -273,7 +289,7 @@ export function usePoolDeposit(options?: UsePoolDepositOptions) {
                 },
                 zeroForOne: true,
                 amountIn: swapAmount,
-                amountOutMinimum: BigInt(0),
+                amountOutMinimum: applySlippage(swapAmount, slippageBps),
                 hookData: "0x" as `0x${string}`,
               },
             ])
@@ -289,7 +305,7 @@ export function usePoolDeposit(options?: UsePoolDepositOptions) {
           params.push(
             encodeAbiParameters(CURRENCY_AMOUNT_TYPE, [
               usdcAddress,
-              BigInt(0),
+              applySlippage(swapAmount, slippageBps),
             ])
           );
         }
